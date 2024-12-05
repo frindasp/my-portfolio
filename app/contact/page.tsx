@@ -37,9 +37,11 @@ export default function Contact() {
 
     const result = await submitContact(formData);
 
+    console.log("result", result);
     if (result.success) {
       setSubmitSuccess(true);
       reset();
+      window.location.reload();
     } else {
       setSubmitError(
         result.error || "An error occurred while submitting the form."
@@ -57,12 +59,7 @@ export default function Contact() {
           <label htmlFor="name" className="block mb-2">
             Name
           </label>
-          <Input
-            id="name"
-            {...register("name")}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
-          />
+          <Input id="name" {...register("name")} placeholder="Your name" />
           {errors.name && (
             <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
           )}
@@ -75,7 +72,6 @@ export default function Contact() {
             id="email"
             type="email"
             {...register("email")}
-            onChange={(e) => setEmail(e.target.value)}
             placeholder="Your email"
           />
           {errors.email && (
@@ -89,7 +85,6 @@ export default function Contact() {
           <Textarea
             id="message"
             {...register("message")}
-            onChange={(e) => setMessage(e.target.value)}
             placeholder="Your message"
           />
           {errors.message && (
