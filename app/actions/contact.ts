@@ -6,12 +6,16 @@ import { contactSchema } from "@/lib/schema";
 import { APP_CONFIG } from "@/lib/constants";
 
 const prisma = new PrismaClient();
-const resend = new Resend(APP_CONFIG.email.resendApiKey);
+// Resend initialized inside the function to avoid build-time errors if API key is missing
 
 export async function submitContact(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
 
   try {
+    if (!APP_CONFIG.email.resendApiKey) {
+      throw new Error("RESEND_API_KEY is not defined");
+    }
+    const resend = new Resend(APP_CONFIG.email.resendApiKey);
     const validatedData = contactSchema.parse(rawData);
 
     // Save to database
