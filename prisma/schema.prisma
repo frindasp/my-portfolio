@@ -3,9 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  // url      = env("DATABASE_URL")
-  url      = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  // url      = env("DIRECT_URL")
 }
 
 model Contact {
@@ -16,3 +16,13 @@ model Contact {
   createdAt DateTime @default(now())
 }
 
+model WebhookEmail {
+  id        String   @id @default(cuid())
+  from      String?
+  to        String?
+  subject   String?
+  text      String?  @db.Text
+  html      String?  @db.Text
+  rawData   Json?
+  createdAt DateTime @default(now())
+}

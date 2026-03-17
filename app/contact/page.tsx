@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { contactSchema, ContactFormData } from "@/lib/schema";
 import { submitContact } from "../actions/contact";
+import { toast } from "sonner";
 
 export default function Contact() {
   const { name, email, message, setName, setEmail, setMessage, reset } =
@@ -21,6 +22,7 @@ export default function Contact() {
   const {
     register,
     handleSubmit,
+    reset: resetForm,
     formState: { errors },
   } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -40,15 +42,23 @@ export default function Contact() {
     console.log("result", result);
     if (result.success) {
       setSubmitSuccess(true);
-      reset();
-      window.location.reload();
+      toast.success("Message sent successfully!");
+      // Kita tidak reset() atau reload() agar data tetap ada sesuai permintaan user
     } else {
-      setSubmitError(
-        result.error || "An error occurred while submitting the form."
-      );
+      const errorMsg = result.error || "An error occurred while submitting the form.";
+      setSubmitError(errorMsg);
+      toast.error(errorMsg);
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleManualReset = () => {
+    reset(); // Reset zustand store
+    resetForm(); // Reset react-hook-form
+    setSubmitSuccess(false);
+    setSubmitError(null);
+    toast.info("Form has been reset.");
   };
 
   return (
@@ -93,14 +103,20 @@ export default function Contact() {
             </p>
           )}
         </div>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Sending..." : "Send Message"}
-        </Button>
+        <div className="flex gap-4">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Sending..." : "Send Message"}
+          </Button>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleManualReset}
+            disabled={isSubmitting}
+          >
+            Reset Form
+          </Button>
+        </div>
       </form>
-      {submitError && <p className="text-red-500 mt-4">{submitError}</p>}
-      {submitSuccess && (
-        <p className="text-green-500 mt-4">Message sent successfully!</p>
-      )}
     </div>
   );
 }
