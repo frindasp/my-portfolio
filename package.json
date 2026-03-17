@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 5009",
+    "dev": "npm i && npx prisma generate && next dev --turbopack -p 5009",
     "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
