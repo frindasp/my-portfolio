@@ -276,25 +276,51 @@ export async function getCurrentUser() {
 export async function getMessages(email?: string, userId?: string) {
   if (!email && !userId) return [];
 
-  const matchedContacts = email
+  const normalizedEmail = email?.trim().toLowerCase();
+  const matchedContacts = normalizedEmail
     ? await prisma.contact.findMany({
-        where: { email },
-        select: { id: true },
+        where: { email: normalizedEmail },
+        select: { id: true, name: true, email: true, message: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
       })
     : [];
 
   const contactIds = matchedContacts.map((contact) => contact.id);
 
-  return await prisma.message.findMany({
+  const messages = await prisma.message.findMany({
     where: {
       OR: [
-        { senderEmail: email },
+        ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
         { senderId: userId },
         ...(contactIds.length ? [{ contactId: { in: contactIds } }] : []),
       ],
     },
     orderBy: { createdAt: "asc" },
   });
+
+  // Fallback: if a contact entry exists but has never been materialized to Message,
+  // expose it in the chat list so user can review/match it first.
+  const materializedContactIds = new Set(
+    messages
+      .filter((message) => message.contactId)
+      .map((message) => message.contactId as string),
+  );
+
+  const contactBackfills = matchedContacts
+    .filter((contact) => !materializedContactIds.has(contact.id))
+    .map((contact) => ({
+      id: `contact-${contact.id}`,
+      content: `[Kontak] ${contact.message}`,
+      senderId: userId || null,
+      senderEmail: contact.email,
+      contactId: contact.id,
+      isAdmin: false,
+      createdAt: contact.createdAt,
+    }));
+
+  return [...messages, ...contactBackfills].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  ) as any;
 }
 
 export async function getMessageOwnershipDiff(email?: string, userId?: string) {
@@ -309,12 +335,27 @@ export async function getMessageOwnershipDiff(email?: string, userId?: string) {
   });
 
   const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
+  const contactIds = Array.from(contactIdSet);
+
+  const orphanContactCount = contactIds.length
+    ? await prisma.contact.count({
+        where: {
+          id: { in: contactIds },
+          Messages: {
+            none: {
+              isAdmin: false,
+            },
+          },
+        },
+      })
+    : 0;
+
   const candidateMessages = await prisma.message.findMany({
     where: {
       isAdmin: false,
       OR: [
         { senderEmail: normalizedEmail },
-        ...(contactIdSet.size ? [{ contactId: { in: Array.from(contactIdSet) }, senderEmail: null }] : []),
+        ...(contactIdSet.size ? [{ contactId: { in: contactIds }, senderEmail: null }] : []),
       ],
       AND: [
         {
@@ -326,7 +367,7 @@ export async function getMessageOwnershipDiff(email?: string, userId?: string) {
       id: true,
     },
   });
-  const pendingCount = candidateMessages.length;
+  const pendingCount = candidateMessages.length + orphanContactCount;
 
   return {
     canSync: pendingCount > 0,
@@ -342,16 +383,17 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const matchedContacts = await prisma.contact.findMany({
     where: { email: normalizedEmail },
-    select: { id: true },
+    select: { id: true, message: true, createdAt: true },
   });
 
   const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
+  const contactIds = Array.from(contactIdSet);
   const candidateMessages = await prisma.message.findMany({
     where: {
       isAdmin: false,
       OR: [
         { senderEmail: normalizedEmail },
-        ...(contactIdSet.size ? [{ contactId: { in: Array.from(contactIdSet) }, senderEmail: null }] : []),
+        ...(contactIdSet.size ? [{ contactId: { in: contactIds }, senderEmail: null }] : []),
       ],
       AND: [
         {
@@ -366,7 +408,39 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
   const messageIdsToClaim = candidateMessages.map((message) => message.id);
 
   if (messageIdsToClaim.length === 0) {
-    return { success: true, updatedCount: 0 };
+    const existingMessageContactIds = contactIds.length
+      ? await prisma.message.findMany({
+          where: {
+            contactId: { in: contactIds },
+            isAdmin: false,
+          },
+          select: { contactId: true },
+        })
+      : [];
+
+    const existingSet = new Set(
+      existingMessageContactIds
+        .map((item) => item.contactId)
+        .filter((id): id is string => !!id),
+    );
+
+    const contactsToMaterialize = matchedContacts.filter((contact) => !existingSet.has(contact.id));
+    if (contactsToMaterialize.length === 0) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    const created = await prisma.message.createMany({
+      data: contactsToMaterialize.map((contact) => ({
+        content: `[Kontak] ${contact.message}`,
+        senderId: userId,
+        senderEmail: normalizedEmail,
+        contactId: contact.id,
+        isAdmin: false,
+        createdAt: contact.createdAt,
+      })),
+    });
+
+    return { success: true, updatedCount: created.count };
   }
 
   const updated = await prisma.message.updateMany({
@@ -379,7 +453,40 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
     },
   });
 
-  return { success: true, updatedCount: updated.count };
+  // Also materialize contacts that still do not have any user message row.
+  const existingMessageContactIds = contactIds.length
+    ? await prisma.message.findMany({
+        where: {
+          contactId: { in: contactIds },
+          isAdmin: false,
+        },
+        select: { contactId: true },
+      })
+    : [];
+
+  const existingSet = new Set(
+    existingMessageContactIds
+      .map((item) => item.contactId)
+      .filter((id): id is string => !!id),
+  );
+  const contactsToMaterialize = matchedContacts.filter((contact) => !existingSet.has(contact.id));
+
+  let createdCount = 0;
+  if (contactsToMaterialize.length > 0) {
+    const created = await prisma.message.createMany({
+      data: contactsToMaterialize.map((contact) => ({
+        content: `[Kontak] ${contact.message}`,
+        senderId: userId,
+        senderEmail: normalizedEmail,
+        contactId: contact.id,
+        isAdmin: false,
+        createdAt: contact.createdAt,
+      })),
+    });
+    createdCount = created.count;
+  }
+
+  return { success: true, updatedCount: updated.count + createdCount };
 }
 
 /**
