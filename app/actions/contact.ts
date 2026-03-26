@@ -1,29 +1,33 @@
 "use server";
 
-import { Resend } from "resend";
 import { PrismaClient } from "@prisma/client";
 import { contactSchema } from "@/lib/schema";
 import { APP_CONFIG } from "@/lib/constants";
+import { sendEmail } from "@/lib/email";
 
 const prisma = new PrismaClient();
-// Resend initialized inside the function to avoid build-time errors if API key is missing
+// unified email utility used instead of Resend
 
 export async function submitContact(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
 
   try {
-    if (!APP_CONFIG.email.resendApiKey) {
-      throw new Error("RESEND_API_KEY is not defined");
-    }
-    const resend = new Resend(APP_CONFIG.email.resendApiKey);
     const validatedData = contactSchema.parse(rawData);
-
+    
     // Save to database
     await prisma.contact.create({
       data: validatedData,
     });
 
-    const emailHtml = `
+    const emailHtml = ({
+      name,
+      email,
+      message,
+    }: {
+      name: string;
+      email: string;
+      message: string;
+    }) => `
       <!DOCTYPE html>
       <html>
         <head>
@@ -46,13 +50,13 @@ export async function submitContact(formData: FormData) {
             </div>
             <div class="content">
               <div class="field-label">Name</div>
-              <div class="field-value">${validatedData.name}</div>
+              <div class="field-value">${name}</div>
               
               <div class="field-label">Email Address</div>
-              <div class="field-value">${validatedData.email}</div>
+              <div class="field-value">${email}</div>
               
               <div class="field-label">Message</div>
-              <div class="field-value" style="white-space: pre-wrap;">${validatedData.message}</div>
+              <div class="field-value" style="white-space: pre-wrap;">${message}</div>
             </div>
             <div class="footer">
               Sent from your Portfolio Website
@@ -62,16 +66,31 @@ export async function submitContact(formData: FormData) {
       </html>
     `;
 
-    const toAdmin = await resend.emails.send({
-      from: APP_CONFIG.email.from,
+    // Send to Admin
+    await sendEmail({
       to: APP_CONFIG.email.recipient,
       subject: `✨ New message from ${validatedData.name}`,
-      html: emailHtml,
+      html: emailHtml({
+        name: validatedData.name,
+        email: validatedData.email,
+        message: validatedData.message,
+      }),
+    });
+
+    // Send to User
+    await sendEmail({
+      to: validatedData.email,
+      subject: `✨ Thank you for contacting me`,
+      html: emailHtml({
+        name: validatedData.name,
+        email: validatedData.email,
+        message: validatedData.message,
+      }),
     });
 
     // Trigger webhook secara manual untuk pencatatan di DB
     try {
-      const baseUrl = APP_CONFIG.baseUrl; 
+      const baseUrl = APP_CONFIG.baseUrl;
       await fetch(`${baseUrl}/api/webhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,7 +99,11 @@ export async function submitContact(formData: FormData) {
             from: APP_CONFIG.email.from,
             to: APP_CONFIG.email.recipient,
             subject: `✨ New message from ${validatedData.name}`,
-            html: emailHtml,
+            html: emailHtml({
+              name: validatedData.name,
+              email: validatedData.email,
+              message: validatedData.message,
+            }),
           },
         }),
       });

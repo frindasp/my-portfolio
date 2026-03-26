@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
-    console.log(">>> Incoming Webhook Payload:", JSON.stringify(payload, null, 2));
-
-    // Check if the payload matches the typical shape for Resend webhook
-    const data = payload.data || {};
+    console.log(">>> Incoming Webhook Type:", payload.type);
+    
+    // Resend payloads usually have the main data at the root or under 'data'
+    const data = payload.data || payload;
     
     // Default mapped fields (adjust according to the actual structure)
     // Sometimes webhook provides `from`, `to`, `subject` directly in `data`
