@@ -374,11 +374,58 @@ export async function sendChatMessage(
   email?: string,
   userId?: string,
 ) {
+  const normalizedContent = content.trim();
+  if (!normalizedContent) {
+    return { success: false, error: "Message is empty" };
+  }
+
+  const currentUser = await getCurrentUser();
+  const resolvedEmail = currentUser?.email || email;
+  const resolvedSenderId = currentUser?.id || userId || null;
+
+  let matchedContactId: string | null = null;
+
+  if (resolvedEmail) {
+    const latestContact = await prisma.contact.findFirst({
+      where: { email: resolvedEmail },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (latestContact) {
+      if (latestContact.message.trim() === normalizedContent) {
+        return {
+          success: false,
+          duplicate: true,
+          error: "Pesan yang sama sudah tersimpan di live chat.",
+        };
+      }
+
+      const updatedContact = await prisma.contact.update({
+        where: { id: latestContact.id },
+        data: {
+          message: normalizedContent,
+          name: currentUser?.name || latestContact.name,
+        },
+      });
+      matchedContactId = updatedContact.id;
+    } else {
+      const createdContact = await prisma.contact.create({
+        data: {
+          email: resolvedEmail,
+          message: normalizedContent,
+          name: currentUser?.name || resolvedEmail.split("@")[0] || "Guest",
+        },
+      });
+      matchedContactId = createdContact.id;
+    }
+  }
+
   const message = await (prisma.message.create as any)({
     data: {
-      content,
-      senderEmail: email,
-      senderId: userId || null, 
+      content: normalizedContent,
+      senderEmail: resolvedEmail,
+      senderId: resolvedSenderId,
+      contactId: matchedContactId,
       isAdmin: false, // User sending message
     },
   });

@@ -23,6 +23,14 @@ export default function ChatWindow() {
   const [syncingOwnership, setSyncingOwnership] = useState(false);
   const [ownershipDiffCount, setOwnershipDiffCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const normalizedContent = content.trim().toLowerCase();
+  const isDuplicateMessage =
+    normalizedContent.length > 0 &&
+    messages.some(
+      (msg) =>
+        msg.content.trim().toLowerCase() === normalizedContent &&
+        (msg.senderId === userId || msg.senderEmail === userEmail),
+    );
 
   useEffect(() => {
     if (userEmail) {
@@ -63,6 +71,8 @@ export default function ChatWindow() {
       if (result.success && result.message) {
         addMessage(result.message);
         setContent("");
+      } else if ((result as any).duplicate) {
+        toast.info((result as any).error || "Pesan yang sama sudah tersimpan.");
       } else {
         toast.error("Failed to send message");
       }
@@ -193,12 +203,17 @@ export default function ChatWindow() {
             size="icon" 
             variant="ghost" 
             onClick={handleSendMessage}
-            disabled={sending || !content.trim()}
+            disabled={sending || !content.trim() || isDuplicateMessage}
             className="absolute right-1 h-9 w-9 rounded-full text-primary hover:text-primary hover:bg-primary/10"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        {isDuplicateMessage && (
+          <p className="mt-2 text-[10px] text-amber-600">
+            Pesan yang sama sudah ada, ubah isi chat untuk mengaktifkan tombol kirim.
+          </p>
+        )}
       </div>
     </div>
   );
