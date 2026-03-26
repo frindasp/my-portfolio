@@ -396,7 +396,7 @@ export async function sendChatMessage(
   }
 
   const currentUser = await getCurrentUser();
-  const resolvedEmail = currentUser?.email || email;
+  const resolvedEmail = (currentUser?.email || email)?.trim().toLowerCase();
   const resolvedSenderId = currentUser?.id || userId || null;
 
   let matchedContactId: string | null = null;
@@ -433,6 +433,30 @@ export async function sendChatMessage(
         },
       });
       matchedContactId = createdContact.id;
+    }
+
+    // Backfill ownership for both new and older contacts/messages with the same email.
+    if (resolvedSenderId) {
+      const matchedContacts = await prisma.contact.findMany({
+        where: { email: resolvedEmail },
+        select: { id: true },
+      });
+
+      const contactIds = matchedContacts.map((contact) => contact.id);
+      await prisma.message.updateMany({
+        where: {
+          isAdmin: false,
+          OR: [
+            { senderEmail: resolvedEmail },
+            ...(contactIds.length ? [{ contactId: { in: contactIds } }] : []),
+          ],
+          AND: [{ OR: [{ senderId: null }, { senderId: { not: resolvedSenderId } }] }],
+        },
+        data: {
+          senderId: resolvedSenderId,
+          senderEmail: resolvedEmail,
+        },
+      });
     }
   }
 
