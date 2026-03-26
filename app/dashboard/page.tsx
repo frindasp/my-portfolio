@@ -8,11 +8,13 @@ import {
   Clock, 
   Zap, 
   ArrowRight,
-  Loader2
+  Loader2,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getCurrentUser } from "@/app/actions/auth";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
@@ -37,25 +39,25 @@ export default function DashboardPage() {
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Welcome Header */}
-      <div className="relative overflow-hidden p-12 rounded-[32px] bg-card border shadow-2xl group">
-         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+      <div className="relative overflow-hidden p-6 md:p-12 rounded-[32px] bg-card border shadow-2xl group">
+         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity hidden sm:block">
             <Zap className="h-64 w-64 -rotate-12" />
          </div>
          <div className="relative z-10 space-y-4">
-            <h1 className="text-5xl font-black tracking-tighter">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight">
               Welcome back, <span className="text-primary">{user?.name?.split(' ')[0] || "User"}</span>!
             </h1>
-            <p className="text-lg text-muted-foreground max-w-xl">
+            <p className="text-base md:text-lg text-muted-foreground max-w-xl">
               Everything is looking good today. You have new messages waiting in your inbox and performance is up 12% from last week.
             </p>
-            <div className="pt-4 flex gap-4">
+            <div className="pt-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
                <Link href="/dashboard/chat">
-                 <Button className="h-14 px-8 rounded-2xl font-bold bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                 <Button className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 rounded-2xl font-bold bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
                     Open Messenger <ArrowRight className="ml-2 h-5 w-5" />
                  </Button>
                </Link>
                <Link href="/dashboard/profile">
-                 <Button variant="outline" className="h-14 px-8 rounded-2xl font-bold border-muted-foreground/20 hover:bg-muted transition-all">
+                 <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-8 rounded-2xl font-bold border-muted-foreground/20 hover:bg-muted transition-all">
                     View Profile
                  </Button>
                </Link>
@@ -122,6 +124,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
