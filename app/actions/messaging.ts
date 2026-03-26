@@ -302,40 +302,31 @@ export async function getMessageOwnershipDiff(email?: string, userId?: string) {
     return { canSync: false, pendingCount: 0 };
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
   const matchedContacts = await prisma.contact.findMany({
-    where: { email },
+    where: { email: normalizedEmail },
     select: { id: true },
   });
-
-  if (matchedContacts.length === 0) {
-    return { canSync: false, pendingCount: 0 };
-  }
 
   const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
   const candidateMessages = await prisma.message.findMany({
     where: {
-      contactId: { in: Array.from(contactIdSet) },
       isAdmin: false,
-      OR: [{ senderId: null }, { senderId: { not: userId } }],
+      OR: [
+        { senderEmail: normalizedEmail },
+        ...(contactIdSet.size ? [{ contactId: { in: Array.from(contactIdSet) }, senderEmail: null }] : []),
+      ],
+      AND: [
+        {
+          OR: [{ senderId: null }, { senderId: { not: userId } }],
+        },
+      ],
     },
     select: {
       id: true,
-      content: true,
-      senderId: true,
-      contactId: true,
-      Contact: {
-        select: {
-          message: true,
-        },
-      },
     },
   });
-
-  const pendingCount = candidateMessages.filter((message) => {
-    const contactMessage = message.Contact?.message?.trim();
-    const content = message.content.trim();
-    return Boolean(message.contactId) && contactMessage !== undefined && content !== contactMessage;
-  }).length;
+  const pendingCount = candidateMessages.length;
 
   return {
     canSync: pendingCount > 0,
@@ -348,41 +339,31 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
     return { success: false, updatedCount: 0, error: "Unauthorized" };
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
   const matchedContacts = await prisma.contact.findMany({
-    where: { email },
+    where: { email: normalizedEmail },
     select: { id: true },
   });
-
-  if (matchedContacts.length === 0) {
-    return { success: true, updatedCount: 0 };
-  }
 
   const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
   const candidateMessages = await prisma.message.findMany({
     where: {
-      contactId: { in: Array.from(contactIdSet) },
       isAdmin: false,
-      OR: [{ senderId: null }, { senderId: { not: userId } }],
+      OR: [
+        { senderEmail: normalizedEmail },
+        ...(contactIdSet.size ? [{ contactId: { in: Array.from(contactIdSet) }, senderEmail: null }] : []),
+      ],
+      AND: [
+        {
+          OR: [{ senderId: null }, { senderId: { not: userId } }],
+        },
+      ],
     },
     select: {
       id: true,
-      content: true,
-      contactId: true,
-      Contact: {
-        select: {
-          message: true,
-        },
-      },
     },
   });
-
-  const messageIdsToClaim = candidateMessages
-    .filter((message) => {
-      const contactMessage = message.Contact?.message?.trim();
-      const content = message.content.trim();
-      return Boolean(message.contactId) && contactMessage !== undefined && content !== contactMessage;
-    })
-    .map((message) => message.id);
+  const messageIdsToClaim = candidateMessages.map((message) => message.id);
 
   if (messageIdsToClaim.length === 0) {
     return { success: true, updatedCount: 0 };
@@ -394,7 +375,7 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
     },
     data: {
       senderId: userId,
-      senderEmail: email,
+      senderEmail: normalizedEmail,
     },
   });
 
