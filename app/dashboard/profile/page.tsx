@@ -4,19 +4,22 @@ import { useState, useEffect } from "react";
 import { User, Mail, Shield, Zap, Sparkles, LogOut, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { logout, getCurrentUser } from "@/app/actions/auth";
+import { logout, getCurrentUser, updateCurrentUserFullName } from "@/app/actions/auth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState("");
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const loadProfile = async () => {
       const u = await getCurrentUser();
       setUser(u);
+      setFullName(u?.name ?? "");
       setLoading(false);
     };
     loadProfile();
@@ -26,6 +29,27 @@ export default function ProfilePage() {
     await logout();
     toast.success("Disconnected safety.");
     router.push("/login");
+  };
+
+  const handleUpdateFullName = async () => {
+    if (!fullName.trim()) {
+      toast.error("Full name is required.");
+      return;
+    }
+
+    setSaving(true);
+    const result = await updateCurrentUserFullName(fullName);
+    setSaving(false);
+
+    if (!result.success) {
+      toast.error(result.error || "Failed to update profile.");
+      return;
+    }
+
+    const updatedName = result.user?.name ?? "";
+    setUser((prev: any) => ({ ...prev, name: updatedName }));
+    setFullName(updatedName);
+    toast.success("Full name updated.");
   };
 
   if (loading) return (
@@ -68,7 +92,22 @@ export default function ProfilePage() {
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Full Name</label>
-                     <Input readOnly defaultValue={user?.name} className="h-12 rounded-2xl bg-muted/30 font-bold border-muted-foreground/10 focus:ring-primary/20" />
+                     <div className="space-y-3">
+                        <Input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="h-12 rounded-2xl bg-muted/30 font-bold border-muted-foreground/10 focus:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleUpdateFullName}
+                          disabled={saving || fullName.trim() === (user?.name ?? "")}
+                          className="h-10 rounded-xl font-bold"
+                        >
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Save Full Name
+                        </Button>
+                     </div>
                   </div>
                   <div className="space-y-2">
                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Email Address</label>
