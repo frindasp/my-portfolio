@@ -311,19 +311,31 @@ export async function getMessageOwnershipDiff(email?: string, userId?: string) {
     return { canSync: false, pendingCount: 0 };
   }
 
-  const pendingCount = await prisma.message.count({
+  const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
+  const candidateMessages = await prisma.message.findMany({
     where: {
-      contactId: { in: matchedContacts.map((contact) => contact.id) },
+      contactId: { in: Array.from(contactIdSet) },
       isAdmin: false,
-      OR: [
-        { senderId: null },
-        {
-          senderEmail: email,
-          senderId: { not: userId },
+      OR: [{ senderId: null }, { senderId: { not: userId } }],
+    },
+    select: {
+      id: true,
+      content: true,
+      senderId: true,
+      contactId: true,
+      Contact: {
+        select: {
+          message: true,
         },
-      ],
+      },
     },
   });
+
+  const pendingCount = candidateMessages.filter((message) => {
+    const contactMessage = message.Contact?.message?.trim();
+    const content = message.content.trim();
+    return Boolean(message.contactId) && contactMessage !== undefined && content !== contactMessage;
+  }).length;
 
   return {
     canSync: pendingCount > 0,
@@ -345,17 +357,40 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
     return { success: true, updatedCount: 0 };
   }
 
+  const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
+  const candidateMessages = await prisma.message.findMany({
+    where: {
+      contactId: { in: Array.from(contactIdSet) },
+      isAdmin: false,
+      OR: [{ senderId: null }, { senderId: { not: userId } }],
+    },
+    select: {
+      id: true,
+      content: true,
+      contactId: true,
+      Contact: {
+        select: {
+          message: true,
+        },
+      },
+    },
+  });
+
+  const messageIdsToClaim = candidateMessages
+    .filter((message) => {
+      const contactMessage = message.Contact?.message?.trim();
+      const content = message.content.trim();
+      return Boolean(message.contactId) && contactMessage !== undefined && content !== contactMessage;
+    })
+    .map((message) => message.id);
+
+  if (messageIdsToClaim.length === 0) {
+    return { success: true, updatedCount: 0 };
+  }
+
   const updated = await prisma.message.updateMany({
     where: {
-      contactId: { in: matchedContacts.map((contact) => contact.id) },
-      isAdmin: false,
-      OR: [
-        { senderId: null },
-        {
-          senderEmail: email,
-          senderId: { not: userId },
-        },
-      ],
+      id: { in: messageIdsToClaim },
     },
     data: {
       senderId: userId,
