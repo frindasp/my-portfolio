@@ -4,14 +4,24 @@ import { PrismaClient } from "@prisma/client";
 import { contactSchema } from "@/lib/schema";
 import { APP_CONFIG } from "@/lib/constants";
 import { sendEmail } from "@/lib/email";
+import { redirect } from "next/navigation";
 
 const prisma = new PrismaClient();
-// unified email utility used instead of Resend
 
 export async function submitContact(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
+  const email = rawData.email as string;
 
   try {
+    // Check if the email already has an account or has contacted before
+    const existingUser = await prisma.user.findFirst({ where: { email } });
+    const existingContact = await prisma.contact.findFirst({ where: { email } });
+
+    if (existingUser || existingContact) {
+      // Suggest login/registration via the login page
+      return { redirect: "/login", email };
+    }
+
     const validatedData = contactSchema.parse(rawData);
     
     // Save to database

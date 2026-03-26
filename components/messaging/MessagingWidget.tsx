@@ -18,12 +18,12 @@ export default function MessagingWidget() {
   if (!isMounted) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[9999] flex flex-col items-end">
       {/* Messaging Window */}
       <div 
         className={cn(
-          "mb-4 w-[350px] md:w-[400px] h-[500px] max-h-[70vh] rounded-2xl border bg-background shadow-2xl transition-all duration-300 origin-bottom-right overflow-hidden",
-          isOpen ? "scale-100 opacity-100 translate-y-0" : "scale-75 opacity-0 translate-y-10 pointer-events-none"
+          "mb-4 w-[calc(100vw-2rem)] max-w-[350px] md:max-w-[400px] h-[500px] max-h-[70vh] rounded-2xl border bg-background shadow-2xl transition-all duration-300 origin-bottom-right overflow-hidden",
+          isOpen ? "scale-100 opacity-100 translate-y-0 pointer-events-auto" : "scale-75 opacity-0 translate-y-10 pointer-events-none"
         )}
       >
         <ChatWindow />

@@ -11,6 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { contactSchema, ContactFormData } from "@/lib/schema";
 import { submitContact } from "../actions/contact";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function Contact() {
   const { name, email, message, setName, setEmail, setMessage, reset } =
@@ -18,6 +19,7 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const router = useRouter();
 
   const {
     register,
@@ -37,15 +39,22 @@ export default function Contact() {
     const formData = new FormData();
     Object.entries(data).forEach(([key, value]) => formData.append(key, value));
 
-    const result = await submitContact(formData);
+    const result = (await submitContact(formData)) as any;
 
-    console.log("result", result);
+    if (result.redirect) {
+      toast.info("Welcome back! Please login to continue.");
+      router.push(
+        `${result.redirect}?email=${encodeURIComponent(result.email || "")}`
+      );
+      return;
+    }
+
     if (result.success) {
       setSubmitSuccess(true);
       toast.success("Message sent successfully!");
-      // Kita tidak reset() atau reload() agar data tetap ada sesuai permintaan user
     } else {
-      const errorMsg = result.error || "An error occurred while submitting the form.";
+      const errorMsg =
+        result.error || "An error occurred while submitting the form.";
       setSubmitError(errorMsg);
       toast.error(errorMsg);
     }

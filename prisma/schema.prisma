@@ -33,15 +33,15 @@ model Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String?
   email     String
   password  String
   roleId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   Messages  Message[]
+  Role      Role      @relation(fields: [roleId], references: [id])
 
   @@unique([email, roleId])
   @@index([roleId], map: "User_roleId_fkey")
@@ -55,6 +55,8 @@ model Message {
   isAdmin     Boolean  @default(false)
   createdAt   DateTime @default(now())
   User        User?    @relation(fields: [senderId], references: [id])
+
+  @@index([senderId], map: "Message_senderId_fkey")
 }
 
 model VerificationToken {
