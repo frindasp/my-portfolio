@@ -9,7 +9,7 @@ import {
   syncMessageOwnership,
 } from "@/app/actions/messaging";
 import { io, Socket } from "socket.io-client";
-import { Send, Loader2, User, MessageCircle, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Send, Loader2, User, MessageCircle, Wifi, WifiOff, RefreshCw, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -104,7 +104,7 @@ export default function ChatPage() {
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!content.trim() || sending || !user || !socket) return;
+    if (!content.trim() || sending || !user) return;
 
     setSending(true);
     try {
@@ -115,11 +115,13 @@ export default function ChatPage() {
         // 2. Add locally
         setMessages((prev) => [...prev, res.message]);
         
-        // 3. Emit to others via Socket.io
-        socket.emit("client-message", {
-          ...res.message,
-          room: `chat-${user.id}`
-        });
+        // 3. Emit to others via Socket.io when available
+        if (socket && connected) {
+          socket.emit("client-message", {
+            ...res.message,
+            room: `chat-${user.id}`
+          });
+        }
         
         setContent("");
       } else {
@@ -188,8 +190,8 @@ export default function ChatPage() {
                   <Wifi className="h-3 w-3" /> Live
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] text-red-500 font-bold uppercase tracking-wider">
-                  <WifiOff className="h-3 w-3" /> Reconnecting...
+                <span className="flex items-center gap-1 text-[10px] text-amber-500 font-bold uppercase tracking-wider">
+                  <WifiOff className="h-3 w-3" /> Offline mode
                 </span>
               )}
             </div>
@@ -244,11 +246,20 @@ export default function ChatPage() {
                 >
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 </div>
-                <span className={cn(
-                  "mt-2 text-[10px] font-medium opacity-50",
-                  isMe ? "self-end" : "self-start"
-                )}>
+                <span
+                  className={cn(
+                    "mt-2 text-[10px] font-medium opacity-50 flex items-center gap-1",
+                    isMe ? "self-end" : "self-start"
+                  )}
+                >
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {isMe && (
+                    connected ? (
+                      <CheckCheck className="h-3 w-3 text-sky-500" />
+                    ) : (
+                      <Check className="h-3 w-3" />
+                    )
+                  )}
                 </span>
               </div>
             );
@@ -264,12 +275,12 @@ export default function ChatPage() {
             onChange={(e) => setContent(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 rounded-2xl h-14 pl-6 pr-14 bg-background border-muted shadow-sm focus:ring-primary/20"
-            disabled={sending || !connected}
+            disabled={sending}
           />
           <Button 
             type="submit"
             size="icon"
-            disabled={sending || !content.trim() || !connected}
+            disabled={sending || !content.trim()}
             className="absolute right-2 h-10 w-10 rounded-xl transition-all active:scale-95 shadow-lg"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
