@@ -65,7 +65,7 @@ function LoginForm() {
       const res = await verifyOTP(email, otp);
       if (res.success) {
         toast.success("Login successful!");
-        router.push("/portfolio"); // Or redirect to where they came from
+        router.push("/dashboard"); 
         router.refresh();
       } else {
         toast.error(res.error || "Invalid OTP");

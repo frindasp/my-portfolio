@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 
 const sidebarItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Messages", href: "/dashboard/chat", icon: MessageSquare },
+  { name: "Live Chat (Socket.io)", href: "/dashboard/chat", icon: MessageSquare },
+  { name: "Pusher Events", href: "/dashboard/pusher-chat", icon: Zap },
   { name: "Profile", href: "/dashboard/profile", icon: User },
 ];
 
