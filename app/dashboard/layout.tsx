@@ -172,13 +172,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header Bar (Mobile only) */}
         <header className="md:hidden flex items-center justify-between p-4 bg-card border-b">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Zap className="h-6 w-6 text-primary" />
-            <span className="font-bold">Portfolio OS</span>
+            <span className="font-bold truncate">Portfolio OS</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
-            <Menu className="h-6 w-6" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link href="/dashboard/chat" className="mr-1">
+              <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl text-xs font-semibold">
+                Live Chat
+              </Button>
+            </Link>
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
+              <Menu className="h-6 w-6" />
+            </Button>
+          </div>
         </header>
 
         {/* Page Content */}
