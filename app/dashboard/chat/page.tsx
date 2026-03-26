@@ -1,9 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getCurrentUser, getMessages, sendChatMessage } from "@/app/actions/messaging";
+import {
+  getCurrentUser,
+  getMessageOwnershipDiff,
+  getMessages,
+  sendChatMessage,
+  syncMessageOwnership,
+} from "@/app/actions/messaging";
 import { io, Socket } from "socket.io-client";
-import { Send, Loader2, User, MessageCircle, Wifi, WifiOff } from "lucide-react";
+import { Send, Loader2, User, MessageCircle, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -17,6 +23,8 @@ export default function ChatPage() {
   const [user, setUser] = useState<any>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Initialize Socket.io
@@ -78,6 +86,9 @@ export default function ChatPage() {
         // FETCH BY BOTH EMAIL AND ID TO GET ALL HISTORY (AUTO-MERGE)
         const history = await getMessages(currentUser.email, currentUser.id);
         setMessages(history);
+
+        const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
+        setPendingSyncCount(diff.pendingCount || 0);
       }
       setLoading(false);
     };
@@ -121,6 +132,37 @@ export default function ChatPage() {
     }
   };
 
+  const handleSyncMessageOwnership = async () => {
+    if (!user || syncing) return;
+
+    setSyncing(true);
+    try {
+      const res = await syncMessageOwnership(user.email, user.id);
+      if (!res.success) {
+        toast.error((res as any).error || "Gagal memadankan chat.");
+        return;
+      }
+
+      const [history, diff] = await Promise.all([
+        getMessages(user.email, user.id),
+        getMessageOwnershipDiff(user.email, user.id),
+      ]);
+
+      setMessages(history);
+      setPendingSyncCount(diff.pendingCount || 0);
+
+      toast.success(
+        res.updatedCount > 0
+          ? `${res.updatedCount} message berhasil dipadankan ke akun kamu.`
+          : "Tidak ada message yang perlu dipadankan.",
+      );
+    } catch (error) {
+      toast.error("Terjadi kesalahan saat sinkronisasi chat.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50">
@@ -153,6 +195,17 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSyncMessageOwnership}
+          disabled={!user || syncing || pendingSyncCount === 0}
+          className="rounded-xl"
+        >
+          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Padankan Chat{pendingSyncCount > 0 ? ` (${pendingSyncCount})` : ""}
+        </Button>
       </div>
 
       {/* Message List */}
