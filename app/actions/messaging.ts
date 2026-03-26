@@ -172,6 +172,32 @@ export async function verifyOTPAndLogin(
         senderId: user.id,
       }
     });
+
+    const matchedContacts = await prisma.contact.findMany({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (matchedContacts.length > 0) {
+      await prisma.message.updateMany({
+        where: {
+          contactId: { in: matchedContacts.map((contact) => contact.id) },
+          isAdmin: false,
+          OR: [
+            { senderId: null },
+            {
+              senderEmail: email,
+              senderId: { not: user.id },
+            },
+          ],
+        },
+        data: {
+          senderId: user.id,
+          senderEmail: email,
+        },
+      });
+    }
+
     console.log(`Auto-merged messages for ${email}`);
   } catch (mergeError) {
     console.error("Auto-merge failed:", mergeError);
@@ -250,12 +276,94 @@ export async function getCurrentUser() {
 export async function getMessages(email?: string, userId?: string) {
   if (!email && !userId) return [];
 
+  const matchedContacts = email
+    ? await prisma.contact.findMany({
+        where: { email },
+        select: { id: true },
+      })
+    : [];
+
+  const contactIds = matchedContacts.map((contact) => contact.id);
+
   return await prisma.message.findMany({
     where: {
-      OR: [{ senderEmail: email }, { senderId: userId }],
+      OR: [
+        { senderEmail: email },
+        { senderId: userId },
+        ...(contactIds.length ? [{ contactId: { in: contactIds } }] : []),
+      ],
     },
     orderBy: { createdAt: "asc" },
   });
+}
+
+export async function getMessageOwnershipDiff(email?: string, userId?: string) {
+  if (!email || !userId) {
+    return { canSync: false, pendingCount: 0 };
+  }
+
+  const matchedContacts = await prisma.contact.findMany({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (matchedContacts.length === 0) {
+    return { canSync: false, pendingCount: 0 };
+  }
+
+  const pendingCount = await prisma.message.count({
+    where: {
+      contactId: { in: matchedContacts.map((contact) => contact.id) },
+      isAdmin: false,
+      OR: [
+        { senderId: null },
+        {
+          senderEmail: email,
+          senderId: { not: userId },
+        },
+      ],
+    },
+  });
+
+  return {
+    canSync: pendingCount > 0,
+    pendingCount,
+  };
+}
+
+export async function syncMessageOwnership(email?: string, userId?: string) {
+  if (!email || !userId) {
+    return { success: false, updatedCount: 0, error: "Unauthorized" };
+  }
+
+  const matchedContacts = await prisma.contact.findMany({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (matchedContacts.length === 0) {
+    return { success: true, updatedCount: 0 };
+  }
+
+  const updated = await prisma.message.updateMany({
+    where: {
+      contactId: { in: matchedContacts.map((contact) => contact.id) },
+      isAdmin: false,
+      OR: [
+        { senderId: null },
+        {
+          senderEmail: email,
+          senderId: { not: userId },
+        },
+      ],
+    },
+    data: {
+      senderId: userId,
+      senderEmail: email,
+    },
+  });
+
+  return { success: true, updatedCount: updated.count };
 }
 
 /**
