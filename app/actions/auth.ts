@@ -240,3 +240,29 @@ export async function getCurrentUser() {
     return null;
   }
 }
+
+export async function updateCurrentUserFullName(fullName: string) {
+  const trimmedName = fullName?.trim();
+  if (!trimmedName) {
+    return { success: false, error: "Full name is required" };
+  }
+
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("portfolio_session")?.value;
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { name: trimmedName },
+      select: { id: true, name: true, email: true },
+    });
+
+    return { success: true, user: updatedUser };
+  } catch (error) {
+    console.error("Update Full Name Error:", error);
+    return { success: false, error: "Failed to update full name." };
+  }
+}
