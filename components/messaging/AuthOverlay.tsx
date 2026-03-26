@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { checkEmailStatus, sendVerificationOTP, verifyOTPAndRegister } from "@/app/actions/messaging";
+import { checkEmailStatus, sendVerificationOTP, verifyOTPAndLogin } from "@/app/actions/messaging";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import { useMessagingStore } from "@/store/use-messaging-store";
@@ -61,7 +61,7 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
 
     setLoading(true);
     try {
-      const result = await verifyOTPAndRegister(email, otp);
+      const result = await verifyOTPAndLogin(email, otp);
       if (result.success && result.user) {
         if (!isRegistered) {
           // If not registered, we need a password
@@ -90,8 +90,8 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
     setLoading(true);
     try {
       // Re-verify code is still valid (or just use the session state)
-      // Actually verifyOTPAndRegister already handles it
-      const result = await verifyOTPAndRegister(email, otp, password, name);
+      // Actually verifyOTPAndLogin already handles it
+      const result = await verifyOTPAndLogin(email, otp, password, name);
       if (result.success && result.user) {
         setUser({ id: result.user.id, email: result.user.email, name: result.user.name });
         toast.success("Registration successful! You can now chat.");
