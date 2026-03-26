@@ -236,7 +236,7 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
             Login pakai OTP atau password untuk lanjutkan chat kamu.
           </p>
 
-          <div className="grid grid-cols-3 gap-2 mb-4 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 w-full">
             <Button variant={mode === "otp" ? "default" : "outline"} size="sm" onClick={() => setMode("otp")}>OTP</Button>
             <Button variant={mode === "password" ? "default" : "outline"} size="sm" onClick={() => setMode("password")}>Password</Button>
             <Button variant={mode === "forgot" ? "default" : "outline"} size="sm" onClick={() => setMode("forgot")}>Lupa</Button>

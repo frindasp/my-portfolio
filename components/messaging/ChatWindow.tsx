@@ -165,23 +165,27 @@ export default function ChatWindow() {
       )}
 
       {isRegistered && userEmail && userId && (
-        <div className="px-4 py-2 bg-amber-500/10 text-[10px] text-center text-amber-700 border-t border-t-amber-500/20">
-          {ownershipDiffCount > 0 ? (
-            <>
-              Ditemukan <strong>{ownershipDiffCount}</strong> chat dengan email yang sama tetapi belum ditandai sebagai milik akun ini.
-            </>
-          ) : (
-            <>Semua chat dengan email ini sudah sinkron ke akun kamu.</>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleSyncOwnership}
-            disabled={syncingOwnership || ownershipDiffCount === 0}
-            className="ml-2 h-6 px-2 text-[10px]"
-          >
-            {syncingOwnership ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Padankan
-          </Button>
+        <div className="px-4 py-2 bg-amber-500/10 text-[10px] text-amber-700 border-t border-t-amber-500/20">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center sm:text-left leading-relaxed">
+              {ownershipDiffCount > 0 ? (
+                <>
+                  Ditemukan <strong>{ownershipDiffCount}</strong> chat dengan email yang sama tetapi belum ditandai sebagai milik akun ini.
+                </>
+              ) : (
+                <>Semua chat dengan email ini sudah sinkron ke akun kamu.</>
+              )}
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleSyncOwnership}
+              disabled={syncingOwnership || ownershipDiffCount === 0}
+              className="h-7 px-2 text-[10px] self-center sm:self-auto"
+            >
+              {syncingOwnership ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Padankan
+            </Button>
+          </div>
         </div>
       )}
 
