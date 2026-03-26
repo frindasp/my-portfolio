@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Send, Loader2, User, LogIn } from "lucide-react";
+import { Send, Loader2, User, LogIn, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMessagingStore } from "@/store/use-messaging-store";
-import { getMessages, sendChatMessage } from "@/app/actions/messaging";
+import {
+  getMessageOwnershipDiff,
+  getMessages,
+  sendChatMessage,
+  syncMessageOwnership,
+} from "@/app/actions/messaging";
 import AuthOverlay from "./AuthOverlay";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -15,6 +20,8 @@ export default function ChatWindow() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [syncingOwnership, setSyncingOwnership] = useState(false);
+  const [ownershipDiffCount, setOwnershipDiffCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,6 +29,17 @@ export default function ChatWindow() {
       getMessages(userEmail, userId || undefined).then(setMessages);
     }
   }, [userEmail, userId, setMessages]);
+
+  useEffect(() => {
+    if (!userEmail || !userId) {
+      setOwnershipDiffCount(0);
+      return;
+    }
+
+    getMessageOwnershipDiff(userEmail, userId).then((result) => {
+      setOwnershipDiffCount(result.pendingCount);
+    });
+  }, [userEmail, userId, messages.length]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -52,6 +70,27 @@ export default function ChatWindow() {
       toast.error("An error occurred");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSyncOwnership = async () => {
+    if (!userEmail || !userId || syncingOwnership || ownershipDiffCount === 0) return;
+
+    setSyncingOwnership(true);
+    try {
+      const result = await syncMessageOwnership(userEmail, userId);
+      if (result.success) {
+        setOwnershipDiffCount(0);
+        const refreshed = await getMessages(userEmail, userId);
+        setMessages(refreshed);
+        toast.success(`${result.updatedCount} chat lama berhasil dipadankan`);
+      } else {
+        toast.error(result.error || "Gagal memadankan chat lama");
+      }
+    } catch (error) {
+      toast.error("Gagal memadankan chat lama");
+    } finally {
+      setSyncingOwnership(false);
     }
   };
 
@@ -122,6 +161,21 @@ export default function ChatWindow() {
       {!isRegistered && userEmail && (
         <div className="px-4 py-2 bg-primary/5 text-[10px] text-center text-primary/80 border-t border-t-primary/10">
           Chatting as <strong>{userEmail}</strong>. <button onClick={() => setShowAuth(true)} className="underline font-bold">Register</button> to preserve history.
+        </div>
+      )}
+
+      {isRegistered && userEmail && userId && ownershipDiffCount > 0 && (
+        <div className="px-4 py-2 bg-amber-500/10 text-[10px] text-center text-amber-700 border-t border-t-amber-500/20">
+          Ditemukan <strong>{ownershipDiffCount}</strong> chat dengan email yang sama tetapi belum ditandai sebagai milik akun ini.
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleSyncOwnership}
+            disabled={syncingOwnership}
+            className="ml-2 h-6 px-2 text-[10px]"
+          >
+            {syncingOwnership ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Padankan
+          </Button>
         </div>
       )}
 
