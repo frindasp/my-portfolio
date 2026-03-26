@@ -12,7 +12,7 @@ import {
   forgotPassword,
   resetPassword 
 } from "@/app/actions/messaging";
-import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function LoginForm() {
@@ -22,11 +22,15 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [mode, setMode] = useState<"password" | "otp" | "forgot">("otp");
   const [step, setStep] = useState(1); // 1: Input, 2: Verification
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -126,7 +130,11 @@ function LoginForm() {
   // Handle Reset Password
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otp || !newPassword) return;
+    if (!otp || !newPassword || !confirmNewPassword) return;
+    if (newPassword !== confirmNewPassword) {
+      toast.error("Konfirmasi password baru tidak cocok");
+      return;
+    }
     setLoading(true);
     try {
       const res = await resetPassword(email, otp, newPassword);
@@ -135,12 +143,31 @@ function LoginForm() {
         setMode("password");
         setStep(1);
         setNewPassword("");
+        setConfirmNewPassword("");
         setOtp("");
       } else {
         toast.error(res.error || "Reset failed");
       }
     } catch (err) {
       toast.error("Reset failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!email || countdown > 0) return;
+    setLoading(true);
+    try {
+      const res = mode === "forgot" ? await forgotPassword(email) : await sendVerificationOTP(email);
+      if (res.success) {
+        toast.success("Kode baru berhasil dikirim");
+        setCountdown(60);
+      } else {
+        toast.error(res.error || "Gagal mengirim ulang kode");
+      }
+    } catch (err) {
+      toast.error("Gagal mengirim ulang kode");
     } finally {
       setLoading(false);
     }
@@ -180,7 +207,24 @@ function LoginForm() {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Password</label>
                     <button type="button" onClick={() => { setMode("forgot"); setStep(1); }} className="text-[10px] text-primary hover:underline font-bold">Lupa Password?</button>
                   </div>
-                  <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted" disabled={loading} />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted pr-12"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -215,7 +259,51 @@ function LoginForm() {
             {mode === "forgot" && (
                <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Password</label>
-                  <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted" disabled={loading} />
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted pr-12"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
+                      aria-label={showNewPassword ? "Sembunyikan password baru" : "Lihat password baru"}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+               </div>
+            )}
+
+            {mode === "forgot" && (
+               <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Confirm New Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmNewPassword ? "text" : "password"}
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      required
+                      className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted pr-12"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmNewPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
+                      aria-label={showConfirmNewPassword ? "Sembunyikan konfirmasi password baru" : "Lihat konfirmasi password baru"}
+                    >
+                      {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {confirmNewPassword && newPassword !== confirmNewPassword && (
+                    <p className="text-[10px] text-red-500 ml-1">Konfirmasi password belum sama</p>
+                  )}
                </div>
             )}
 
@@ -224,7 +312,7 @@ function LoginForm() {
             </Button>
             
             <div className="text-center">
-              <button type="button" onClick={() => setCountdown(60)} disabled={countdown > 0} className="text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 font-medium">
+              <button type="button" onClick={handleResendCode} disabled={countdown > 0 || loading} className="text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 font-medium">
                 {countdown > 0 ? `Resend code in ${countdown}s` : "Didn't get a code? Resend"}
               </button>
             </div>
@@ -242,4 +330,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-
