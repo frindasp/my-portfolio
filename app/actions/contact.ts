@@ -16,18 +16,32 @@ export async function submitContact(formData: FormData) {
     // Check if the email already has an account or has contacted before
     const existingUser = await prisma.user.findFirst({ where: { email } });
     const existingContact = await prisma.contact.findFirst({ where: { email } });
-
-    if (existingUser || existingContact) {
-      // Suggest login/registration via the login page
-      return { redirect: "/login", email };
-    }
-
     const validatedData = contactSchema.parse(rawData);
-    
-    // Save to database
-    await prisma.contact.create({
+
+    // If user exists, we auto-merge by linking the senderId
+    const userId = existingUser?.id;
+
+    // Save as a contact record
+    const contact = await prisma.contact.create({
       data: validatedData,
     });
+
+    // ALSO: Save as a message record for live chat/history
+    await (prisma.message.create as any)({
+      data: {
+        content: validatedData.message,
+        senderEmail: validatedData.email,
+        contactId: contact.id,
+        senderId: userId || null, // Auto-merge if exists
+        isAdmin: false,
+      },
+    });
+
+    // If they already exist as a user, we can still redirect or just return success
+    if (existingUser) {
+      // Suggest login for full context
+      return { success: true, redirect: "/login", email: validatedData.email, merged: true };
+    }
 
     const emailHtml = ({
       name,

@@ -11,16 +11,16 @@ const prisma = new PrismaClient();
 export async function getChatMessages(userId: string) {
   if (!userId) return [];
 
-  // Fetch all messages related to this user 
-  // (Either they sent it or they are the target - but in this simple personal portfolio, 
+  // Fetch all messages related to this user
+  // (Either they sent it or they are the target - but in this simple personal portfolio,
   // usually it's User <-> Admin)
   try {
     return await prisma.message.findMany({
       where: {
         OR: [
           { senderId: userId },
-          // In a real multi-user chat, we'd need a receiverId, 
-          // but for portfolio contact, let's assume all messages with specific senderId 
+          // In a real multi-user chat, we'd need a receiverId,
+          // but for portfolio contact, let's assume all messages with specific senderId
           // are the one chat thread.
         ],
       },
@@ -47,7 +47,6 @@ export async function sendChatMessage(content: string) {
       data: {
         content,
         senderId: user.id,
-        senderEmail: user.email,
         isAdmin: false, // For users
       },
       include: { User: { select: { name: true, email: true } } },

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getCurrentUser } from "@/app/actions/auth";
-import { getChatMessages, sendChatMessage } from "@/app/actions/chat";
+import { getCurrentUser, getMessages, sendChatMessage } from "@/app/actions/messaging";
 import { io, Socket } from "socket.io-client";
 import { Send, Loader2, User, MessageCircle, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,7 +75,8 @@ export default function ChatPage() {
       const currentUser = await getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
-        const history = await getChatMessages(currentUser.id);
+        // FETCH BY BOTH EMAIL AND ID TO GET ALL HISTORY (AUTO-MERGE)
+        const history = await getMessages(currentUser.email, currentUser.id);
         setMessages(history);
       }
       setLoading(false);
@@ -98,7 +98,8 @@ export default function ChatPage() {
     setSending(true);
     try {
       // 1. Save to DB via Server Action
-      const res = await sendChatMessage(content);
+      // PASS CONTENT, EMAIL, AND ID FOR TRACKING
+      const res = await sendChatMessage(content, user.email, user.id);
       if (res.success && res.message) {
         // 2. Add locally
         setMessages((prev) => [...prev, res.message]);
@@ -111,7 +112,7 @@ export default function ChatPage() {
         
         setContent("");
       } else {
-        toast.error(res.error || "Failed to send");
+        toast.error((res as any).error || "Failed to send");
       }
     } catch (err) {
       toast.error("Something went wrong");

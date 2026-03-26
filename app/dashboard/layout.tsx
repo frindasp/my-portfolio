@@ -14,7 +14,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { logout, getCurrentUser } from "@/app/actions/auth";
+import { logout, getCurrentUser } from "@/app/actions/messaging";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
