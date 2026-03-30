@@ -307,9 +307,9 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
       expectedChallenge,
       expectedOrigin: ORIGIN,
       expectedRPID: RP_ID,
-      authenticator: {
-         credentialID: isoBase64URL.toBuffer(authenticator.credentialID),
-         credentialPublicKey: new Uint8Array(authenticator.publicKey as Buffer),
+      credential: {
+         id: authenticator.credentialID,
+         publicKey: new Uint8Array(authenticator.publicKey as Buffer),
          counter: Number(authenticator.counter),
       }
     })) as any;

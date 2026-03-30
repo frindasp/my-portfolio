@@ -119,11 +119,11 @@ function LoginForm() {
     try {
       const res = await sendVerificationOTP(email);
       if (res.success) {
-        toast.success("OTP sent to your email!");
+        toast.success(res.message || "OTP generated! Please ask admin for your code.");
         setStep(2);
         setCountdown(60);
       } else {
-        toast.error(res.error || "Failed to send OTP");
+        toast.error(res.error || "Failed to generate OTP");
       }
     } catch (err) {
       toast.error("Something went wrong");
@@ -161,11 +161,11 @@ function LoginForm() {
     try {
       const res = await forgotPassword(email);
       if (res.success) {
-        toast.success("Reset code sent to email!");
+        toast.success(res.message || "Reset request sent! Please ask admin for your code.");
         setStep(2);
         setCountdown(60);
       } else {
-        toast.error(res.error || "Failed to process request");
+        toast.error(res.error || "Failed to process reset request");
       }
     } catch (err) {
       toast.error("Something went wrong");
@@ -208,10 +208,10 @@ function LoginForm() {
     try {
       const res = mode === "forgot" ? await forgotPassword(email) : await sendVerificationOTP(email);
       if (res.success) {
-        toast.success("Kode baru berhasil dikirim");
+        toast.success(res.message || "Kode baru berhasil digenerate, silahkan minta ke admin");
         setCountdown(60);
       } else {
-        toast.error(res.error || "Gagal mengirim ulang kode");
+        toast.error(res.error || "Gagal menggenerate ulang kode");
       }
     } catch (err) {
       toast.error("Gagal mengirim ulang kode");

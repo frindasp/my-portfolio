@@ -50,7 +50,7 @@ export async function loginWithPassword(email: string, password: string) {
 /**
  * Request an OTP for login or registration
  */
-export async function requestOTP(email: string) {
+export async function requestOTP(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
   if (!email) return { success: false, error: "Email is required" };
 
   try {
@@ -77,12 +77,12 @@ export async function requestOTP(email: string) {
       </div>
     `;
 
-    const result = await sendEmail({ to: email, subject, html });
-    if (!result.success) {
-      return { success: false, error: "Failed to send OTP email." };
-    }
+    // const result = await sendEmail({ to: email, subject, html });
+    // if (!result.success) {
+    //   return { success: false, error: "Failed to send OTP email." };
+    // }
 
-    return { success: true };
+    return { success: true, message: "OTP generated. Please contact admin for your code." };
   } catch (error) {
     console.error("OTP Request Error:", error);
     return { success: false, error: "An error occurred." };
@@ -155,9 +155,15 @@ export async function forgotPassword(email: string) {
   if (!email) return { success: false, error: "Email is required" };
 
   try {
-    const user = await prisma.user.findFirst({ where: { email } });
+    let userRole = await prisma.role.findUnique({ where: { name: "User" } });
+    if (!userRole) {
+      userRole = await prisma.role.create({ data: { name: "User" } });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { email, roleId: userRole.id }
+    });
     if (!user) {
-      // Don't reveal if user exists, but for simple MVP we can be direct
       return { success: false, error: "No user found with this email" };
     }
 
@@ -170,6 +176,7 @@ export async function forgotPassword(email: string) {
       create: { email, token: otp, expires },
     });
 
+    /*
     await sendEmail({
       to: email,
       subject: "🔑 Password Reset OTP",
@@ -182,8 +189,9 @@ export async function forgotPassword(email: string) {
         </div>
       `,
     });
+    */
 
-    return { success: true };
+    return { success: true, message: "Reset code generated. Please contact admin for your code." };
   } catch (error) {
     console.error("Forgot Password Error:", error);
     return { success: false, error: "Failed to process request." };
@@ -205,9 +213,14 @@ export async function resetPassword(email: string, token: string, newPw: string)
       return { success: false, error: "Invalid or expired OTP" };
     }
 
+    let userRole = await prisma.role.findUnique({ where: { name: "User" } });
+    if (!userRole) {
+      userRole = await prisma.role.create({ data: { name: "User" } });
+    }
+
     const hashedPassword = await bcrypt.hash(newPw, 10);
     await prisma.user.updateMany({
-      where: { email },
+      where: { email, roleId: userRole.id },
       data: { password: hashedPassword }
     });
 
@@ -264,5 +277,22 @@ export async function updateCurrentUserFullName(fullName: string) {
   } catch (error) {
     console.error("Update Full Name Error:", error);
     return { success: false, error: "Failed to update full name." };
+  }
+}
+
+export async function getVerificationTokens() {
+  const user = await getCurrentUser();
+  if (!user || (user.Role as any).name !== "Admin") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const tokens = await prisma.verificationToken.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    return { success: true, tokens: JSON.parse(JSON.stringify(tokens)) };
+  } catch (error) {
+    console.error("Fetch OTP Error:", error);
+    return { success: false, error: "Failed to fetch OTPs" };
   }
 }

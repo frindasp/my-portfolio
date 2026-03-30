@@ -39,30 +39,23 @@ export async function checkEmailStatus(email: string) {
 /**
  * Send OTP for email verification / Login
  */
-export async function sendVerificationOTP(email: string) {
+export async function sendVerificationOTP(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-  // Upsert token in VerificationToken model
-  await prisma.verificationToken.upsert({
-    where: { email_token: { email, token: otp } },
-    update: { expires },
-    create: { email, token: otp, expires },
-  });
+  try {
+    // Upsert token in VerificationToken model
+    await prisma.verificationToken.upsert({
+      where: { email_token: { email, token: otp } },
+      update: { expires },
+      create: { email, token: otp, expires },
+    });
 
-  const res = await sendEmail({
-    to: email,
-    subject: "✨ Verification Code for your Chat Portfolio",
-    html: `
-      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-         <p>Your verification code is:</p>
-         <h1 style="color: #6366f1; letter-spacing: 4px;">${otp}</h1>
-         <p style="color: #888;">This code will expire in 10 minutes.</p>
-      </div>
-    `,
-  });
-
-  return res;
+    return { success: true, message: "Verification code generated. Please contact admin for your code." };
+  } catch (err) {
+    console.error("sendVerificationOTP error:", err);
+    return { success: false, error: "Failed to generate verification code" };
+  }
 }
 
 /**
@@ -233,7 +226,10 @@ export async function verifyOTPAndLogin(
  * Forgot Password (Sends OTP for reset)
  */
 export async function forgotPassword(email: string) {
-  const user = await prisma.user.findFirst({ where: { email } });
+  const userRole = await getOrCreateRole("User");
+  const user = await prisma.user.findFirst({
+    where: { email, roleId: userRole.id }
+  });
   if (!user) return { success: false, error: "User not found" };
 
   const res = await sendVerificationOTP(email);
@@ -252,9 +248,10 @@ export async function resetPassword(email: string, token: string, newPw: string)
     return { success: false, error: "Invalid or expired OTP" };
   }
 
+  const userRole = await getOrCreateRole("User");
   const hashedPassword = await bcrypt.hash(newPw, 10);
   await prisma.user.updateMany({
-    where: { email },
+    where: { email, roleId: userRole.id },
     data: { password: hashedPassword }
   });
 

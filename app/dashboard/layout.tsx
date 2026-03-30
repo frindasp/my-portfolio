@@ -11,6 +11,7 @@ import {
   Menu, 
   X, 
   Zap,
+  ShieldCheck,
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 const sidebarItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Verification Codes", href: "/dashboard/otp", icon: ShieldCheck, adminOnly: true },
   { name: "Live Chat (Socket.io)", href: "/dashboard/chat", icon: MessageSquare },
   { name: "Pusher Events", href: "/dashboard/pusher-chat", icon: Zap },
   { name: "Profile", href: "/dashboard/profile", icon: User },
@@ -81,7 +83,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className="flex-1 px-4 space-y-1 mt-4">
-          {sidebarItems.map((item) => {
+          {sidebarItems
+            .filter(item => !item.adminOnly || (currentUser?.Role as any)?.name === "Admin")
+            .map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
@@ -143,7 +147,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Button>
         </div>
         <nav className="p-4 space-y-2">
-          {sidebarItems.map((item) => (
+          {sidebarItems
+            .filter(item => !item.adminOnly || (currentUser?.Role as any)?.name === "Admin")
+            .map((item) => (
             <Link
               key={item.href}
               href={item.href}

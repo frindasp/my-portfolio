@@ -42,9 +42,9 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
       const res = await sendVerificationOTP(email);
       if (res.success) {
         setStep("otp");
-        toast.success("Verification code sent to your email!");
+        toast.success(res.message || "Verification code generated! Please ask admin for your code.");
       } else {
-        toast.error(res.error || "Failed to send verification email");
+        toast.error(res.error || "Failed to generate verification code");
       }
     } catch (error) {
       toast.error("An error occurred. Please try again.");
