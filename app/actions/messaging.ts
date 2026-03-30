@@ -85,6 +85,15 @@ export async function loginWithPassword(email: string, password: string) {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) return { success: false, error: "Invalid password" };
 
+    // Check for 2FA
+    if (user.twoFactorEnabled) {
+      return { 
+        success: true, 
+        requires2FA: true, 
+        email: user.email 
+      };
+    }
+
     // Set session
     const cookieStore = await cookies();
     cookieStore.set("portfolio_session", user.id, {
@@ -95,6 +104,7 @@ export async function loginWithPassword(email: string, password: string) {
     });
 
     return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.Role.name } };
+
   } catch (error) {
     console.error("Login Password error:", error);
     return { success: false, error: "Something went wrong" };
