@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setCheckingAuth(false);
     };
     checkAuth();
-  }, [router]);
+  }, [router, pathname]);
 
   const handleLogout = async () => {
     try {

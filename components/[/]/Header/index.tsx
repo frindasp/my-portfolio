@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, User, LayoutDashboard, LogIn } from "lucide-react";
 import { ModeToggle } from "@/components/ui/mode-toggle-button";
+import { usePathname } from "next/navigation";
 import { getCurrentUser } from "@/app/actions/auth";
 
 const navItems = [
@@ -16,12 +17,13 @@ const navItems = [
 ];
 
 export function HeaderIndex() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     getCurrentUser().then(setUser);
-  }, []);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-[60] backdrop-blur-md border-b bg-background/80">
