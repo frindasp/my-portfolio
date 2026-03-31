@@ -175,28 +175,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Top Header Bar (Mobile only) */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-card border-b">
+        <header className="md:hidden flex items-center justify-between px-4 h-16 bg-card/80 backdrop-blur-md border-b sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
-            <Zap className="h-6 w-6 text-primary" />
-            <span className="font-bold truncate">Portfolio OS</span>
+            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+               <Zap className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <span className="font-bold truncate tracking-tight">Portfolio OS</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Link href="/dashboard/chat" className="mr-1">
-              <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/chat" className="hidden sm:block">
+              <Button size="sm" className="h-9 px-4 rounded-xl text-xs font-bold shadow-lg shadow-primary/20">
                 Live Chat
               </Button>
             </Link>
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl hover:bg-muted">
               <Menu className="h-6 w-6" />
             </Button>
           </div>
         </header>
 
         {/* Page Content */}
-        <section className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
-          <div className="max-w-6xl mx-auto h-full">
+        <section className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 lg:p-12 scroll-smooth">
+          <div className="max-w-6xl mx-auto h-full space-y-8 sm:space-y-12">
             {children}
           </div>
         </section>

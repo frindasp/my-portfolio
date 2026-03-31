@@ -185,10 +185,12 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="bg-card border rounded-[32px] p-6 sm:p-8 space-y-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b">
           <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6 text-primary shrink-0" />
-            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight">Security & Passkeys</h3>
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+               <Shield className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight leading-tight">Security & Passkeys</h3>
           </div>
 
           {/* Dropdown */}
@@ -242,20 +244,22 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
 
         <div className="space-y-6">
           {/* 2FA Toggle */}
-          <div className="flex items-center justify-between p-6 rounded-2xl bg-primary/5 border border-primary/10">
-            <div className="space-y-1">
-              <h4 className="font-bold flex items-center gap-2">
-                Two-Factor Authentication (2FA)
-                <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full ${twoFactorEnabled ? 'bg-green-500/20 text-green-600' : 'bg-amber-500/20 text-amber-600'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-5 sm:p-6 rounded-2xl bg-primary/5 border border-primary/10 gap-4">
+            <div className="space-y-1.5 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="font-bold text-sm sm:text-base">Two-Factor Authentication (2FA)</h4>
+                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${twoFactorEnabled ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'}`}>
                   {twoFactorEnabled ? 'Active' : 'Inactive'}
                 </span>
-              </h4>
-              <p className="text-sm text-muted-foreground">Require a Passkey check when logging in or resetting password.</p>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed pr-8">Require a Passkey check when logging in or resetting password.</p>
             </div>
-            <button onClick={handleToggle2FA} disabled={updating2FA}
-              className="text-primary hover:scale-110 transition-transform disabled:opacity-50">
-              {updating2FA ? <Loader2 className="h-6 w-6 animate-spin" /> : twoFactorEnabled ? <ToggleRight className="h-10 w-10 shrink-0" /> : <ToggleLeft className="h-10 w-10 text-muted-foreground shrink-0" />}
-            </button>
+            <div className="flex items-center justify-end sm:justify-center">
+               <button onClick={handleToggle2FA} disabled={updating2FA}
+                 className="text-primary hover:scale-110 transition-transform disabled:opacity-50 active:scale-95">
+                 {updating2FA ? <Loader2 className="h-6 w-6 animate-spin" /> : twoFactorEnabled ? <ToggleRight className="h-10 w-10 shrink-0" /> : <ToggleLeft className="h-10 w-10 text-muted-foreground shrink-0" />}
+               </button>
+            </div>
           </div>
 
           {/* MFA Reminder Preference status */}
@@ -346,29 +350,29 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
                 <p className="text-sm text-muted-foreground">No authenticator apps configured.</p>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:gap-4">
                 {totpList.map((totp) => (
-                  <div key={totp.id} className="flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 group hover:border-emerald-500/30 transition-colors">
+                  <div key={totp.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 group hover:border-emerald-500/30 transition-all gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
                         <Smartphone className="h-5 w-5 text-emerald-600" />
                       </div>
-                      <div>
-                        <p className="font-bold text-sm">{totp.name}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Added {new Date(totp.createdAt).toLocaleDateString()}
-                          <span className={`ml-2 font-bold ${totp.enabled ? "text-green-600" : "text-muted-foreground"}`}>
-                            ● {totp.enabled ? "Active" : "Disabled"}
-                          </span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm truncate">{totp.name}</p>
+                        <p className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-2">
+                           Added {new Date(totp.createdAt).toLocaleDateString()}
+                           <span className={`font-black uppercase tracking-tighter ${totp.enabled ? "text-emerald-600" : "text-muted-foreground"}`}>
+                             ● {totp.enabled ? "Active" : "Disabled"}
+                           </span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => handleToggleTOTP(totp.id, !totp.enabled)} className="text-muted-foreground hover:scale-110 transition-transform">
+                    <div className="flex items-center justify-end gap-3 sm:gap-2">
+                      <button onClick={() => handleToggleTOTP(totp.id, !totp.enabled)} className="text-muted-foreground hover:scale-110 transition-transform active:scale-95">
                         {totp.enabled ? <ToggleRight className="h-8 w-8 text-emerald-600" /> : <ToggleLeft className="h-8 w-8" />}
                       </button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteTOTP(totp.id)}
-                        className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -389,24 +393,24 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
                 <p className="text-sm text-muted-foreground">No passkeys registered yet.</p>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:gap-4">
                 {passkeys.map((pk) => (
-                  <div key={pk.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-muted-foreground/10 group hover:border-primary/30 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-background flex items-center justify-center border shadow-sm">
+                  <div key={pk.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-muted/30 border border-muted-foreground/10 group hover:border-primary/30 transition-all gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-10 w-10 rounded-xl bg-card flex items-center justify-center border shadow-sm shrink-0">
                         <Key className="h-5 w-5 text-primary" />
                       </div>
-                      <div>
-                        <p className="font-bold text-sm">Passkey ({pk.credentialDeviceType})</p>
-                        <p className="text-[10px] w-[180px] sm:w-[250px] text-muted-foreground font-mono truncate">{pk.credentialID}</p>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm truncate">Passkey ({pk.credentialDeviceType})</p>
+                        <p className="text-[10px] text-muted-foreground font-mono truncate">{pk.credentialID}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => handleTogglePasskey(pk.id, !pk.enabled)} className="text-muted-foreground hover:scale-110 transition-transform">
+                    <div className="flex items-center justify-end gap-3 sm:gap-2 shrink-0">
+                      <button onClick={() => handleTogglePasskey(pk.id, !pk.enabled)} className="text-muted-foreground hover:scale-110 transition-transform active:scale-95">
                         {pk.enabled ? <ToggleRight className="h-8 w-8 text-primary" /> : <ToggleLeft className="h-8 w-8" />}
                       </button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeletePasskey(pk.id)}
-                        className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

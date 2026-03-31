@@ -74,15 +74,15 @@ export default function ProfilePage() {
          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform">
             <Sparkles className="h-48 w-48 text-primary shadow-2xl" />
          </div>
-         <div className="flex flex-col md:flex-row items-center gap-10 relative z-10 text-center md:text-left">
-            <div className="h-32 w-32 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground font-black text-6xl shadow-2xl shadow-primary/30 transform transition-transform hover:scale-105 active:scale-95 duration-300">
+         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-10 relative z-10 text-center md:text-left">
+            <div className="h-28 w-28 md:h-32 md:w-32 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground font-black text-5xl md:text-6xl shadow-2xl shadow-primary/30 transform transition-transform hover:scale-105 active:scale-95 duration-300">
                {user?.name?.charAt(0).toUpperCase()}
             </div>
-            <div className="space-y-3">
-               <h1 className="text-4xl font-extrabold tracking-tighter">{user?.name}</h1>
-               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-                  <span className="px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-black uppercase tracking-widest border border-primary/10">Member Since Mar 2026</span>
-                  <span className="flex items-center gap-1 text-sm text-muted-foreground"><Shield className="h-4 w-4 text-green-500" /> Active Verified</span>
+            <div className="space-y-3 sm:space-y-4">
+               <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter leading-none">{user?.name}</h1>
+               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4">
+                  <span className="px-3 sm:px-4 py-1.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-black uppercase tracking-widest border border-primary/20">Member Since Mar 2026</span>
+                  <span className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground font-medium"><Shield className="h-4 w-4 text-emerald-500" /> Active Verified</span>
                </div>
             </div>
          </div>
@@ -178,12 +178,14 @@ export default function ProfilePage() {
                </div>
             </div>
 
-            <button onClick={() => router.back()} className="w-full h-16 flex items-center justify-center gap-3 border-2 border-dashed border-muted rounded-[32px] text-muted-foreground hover:border-primary hover:text-primary transition-all font-black text-sm uppercase tracking-widest group">
-               <ArrowLeft className="h-5 w-5 group-hover:-translate-x-2 transition-transform" /> Go Back
-            </button>
+             <button 
+               onClick={() => router.back()} 
+               className="w-full h-14 sm:h-16 flex items-center justify-center gap-3 border-2 border-dashed border-muted rounded-[32px] text-muted-foreground hover:border-primary/50 hover:text-primary transition-all font-black text-xs sm:text-sm uppercase tracking-widest group shadow-sm hover:shadow-md"
+             >
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 group-hover:-translate-x-2 transition-transform" /> Go Back
+             </button>
          </div>
       </div>
     </div>
   );
 }
-
