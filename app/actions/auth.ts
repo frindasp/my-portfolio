@@ -247,7 +247,7 @@ export async function getCurrentUser() {
   try {
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, twoFactorEnabled: true, Role: true },
+      select: { id: true, email: true, name: true, twoFactorEnabled: true, Role: true, mfaDismissedAt: true },
     });
   } catch (error) {
     return null;

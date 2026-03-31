@@ -68,9 +68,9 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in zoom-in duration-500">
+    <div className="max-w-4xl mx-auto space-y-8 sm:space-y-12 animate-in fade-in zoom-in duration-500 pb-20 px-2 sm:px-0">
       {/* Profile Header */}
-      <div className="p-10 border rounded-[32px] bg-card shadow-2xl relative overflow-hidden group">
+      <div className="p-6 sm:p-10 border rounded-[32px] bg-card shadow-xl relative overflow-hidden group">
          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform">
             <Sparkles className="h-48 w-48 text-primary shadow-2xl" />
          </div>
@@ -93,10 +93,10 @@ export default function ProfilePage() {
          <div className="lg:col-span-2 space-y-8">
             {activeTab === "general" ? (
                <div className="space-y-8">
-                  <div className="bg-card border rounded-[32px] p-8 space-y-8">
+                  <div className="bg-card border rounded-[32px] p-6 sm:p-8 space-y-8 shadow-sm">
                      <div className="flex items-center gap-3 pb-6 border-b">
                         <User className="h-6 w-6 text-primary" />
-                        <h3 className="text-2xl font-black italic tracking-tight">Account Details</h3>
+                        <h3 className="text-xl sm:text-2xl font-black italic tracking-tight">Account Details</h3>
                      </div>
                      
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

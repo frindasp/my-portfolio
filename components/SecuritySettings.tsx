@@ -179,13 +179,16 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
     setTimeout(() => setSecretCopied(false), 2000);
   };
 
+  const mfaDismissedDate = initialUser?.mfaDismissedAt ? new Date(initialUser.mfaDismissedAt) : null;
+  const isDismissedToday = mfaDismissedDate && mfaDismissedDate.toDateString() === new Date().toDateString();
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="bg-card border rounded-[32px] p-8 space-y-8">
-        <div className="flex items-center justify-between pb-6 border-b">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+      <div className="bg-card border rounded-[32px] p-6 sm:p-8 space-y-8 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b">
           <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6 text-primary" />
-            <h3 className="text-2xl font-black italic tracking-tight">Security & Passkeys</h3>
+            <Shield className="h-6 w-6 text-primary shrink-0" />
+            <h3 className="text-xl sm:text-2xl font-black italic tracking-tight">Security & Passkeys</h3>
           </div>
 
           {/* Dropdown */}
@@ -251,8 +254,27 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
             </div>
             <button onClick={handleToggle2FA} disabled={updating2FA}
               className="text-primary hover:scale-110 transition-transform disabled:opacity-50">
-              {updating2FA ? <Loader2 className="h-6 w-6 animate-spin" /> : twoFactorEnabled ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10 text-muted-foreground" />}
+              {updating2FA ? <Loader2 className="h-6 w-6 animate-spin" /> : twoFactorEnabled ? <ToggleRight className="h-10 w-10 shrink-0" /> : <ToggleLeft className="h-10 w-10 text-muted-foreground shrink-0" />}
             </button>
+          </div>
+
+          {/* MFA Reminder Preference status */}
+          <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+             <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-amber-700">MFA Reminder Status</h4>
+                <p className="text-[10px] text-amber-800/60 font-medium">
+                   {isDismissedToday 
+                     ? "You've opted to skip MFA prompts for today." 
+                     : initialUser?.mfaDismissedAt 
+                        ? `Last skipped on ${mfaDismissedDate?.toLocaleDateString()}`
+                        : "You'll be prompted to fix security if 2FA is inactive."}
+                </p>
+             </div>
+             {isDismissedToday && (
+                <div className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-700 text-[9px] font-black uppercase tracking-tighter self-start sm:self-auto">
+                   Skipped Today
+                </div>
+             )}
           </div>
 
           {/* TOTP Setup Inline */}
