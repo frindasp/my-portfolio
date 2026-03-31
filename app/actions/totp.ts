@@ -23,7 +23,7 @@ export async function generateTOTPSetup(name: string = "Authenticator") {
   if (!user) return { success: false, error: "User not found" };
 
   const totp = new OTPAuth.TOTP({
-    issuer: "Portfolio OS",
+    issuer: "Taufania Frinda Portfolio OS",
     label: user.email,
     algorithm: "SHA1",
     digits: 6,
@@ -40,9 +40,9 @@ export async function generateTOTPSetup(name: string = "Authenticator") {
     color: { dark: "#000000", light: "#ffffff" },
   });
 
-  // Create a new TOTP record (not enabled yet until verified)
+  // Create a new TOTP record (not setup fully until verified)
   const record = await prisma.totpAuthenticator.create({
-    data: { userId, name, secret, enabled: false },
+    data: { userId, name, secret, setupComplete: false, enabled: true },
   });
 
   return {
@@ -86,10 +86,28 @@ export async function verifyAndEnableTOTP(totpId: string, code: string) {
 
   await prisma.totpAuthenticator.update({
     where: { id: totpId },
-    data: { enabled: true },
+    data: { setupComplete: true },
   });
 
   return { success: true };
+}
+
+/**
+ * Toggle a TOTP authenticator's enabled state
+ */
+export async function toggleTOTPAction(totpId: string, enabled: boolean) {
+  const userId = await getSessionUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.totpAuthenticator.updateMany({
+      where: { id: totpId, userId },
+      data: { enabled },
+    });
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: "Failed to update" };
+  }
 }
 
 /**
@@ -114,7 +132,7 @@ export async function fetchTOTPList() {
   if (!userId) return { success: false, items: [] };
 
   const items = await prisma.totpAuthenticator.findMany({
-    where: { userId },
+    where: { userId, setupComplete: true },
     select: { id: true, name: true, enabled: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
@@ -130,7 +148,7 @@ export async function verifyTOTPCode(userId: string, code: string) {
   if (!user) return { success: false, error: "User not found" };
 
   const totpRecords = await prisma.totpAuthenticator.findMany({
-    where: { userId, enabled: true },
+    where: { userId, enabled: true, setupComplete: true },
   });
 
   if (totpRecords.length === 0) {

@@ -52,14 +52,15 @@ model User {
 }
 
 model TotpAuthenticator {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String   @default("Authenticator")
-  secret    String
-  enabled   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  userId        String
+  name          String   @default("Authenticator")
+  secret        String
+  setupComplete Boolean  @default(false)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -73,6 +74,7 @@ model Authenticator {
   credentialDeviceType String
   credentialBackedUp   Boolean
   transports           String?
+  enabled              Boolean @default(true)
   User                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

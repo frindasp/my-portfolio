@@ -135,6 +135,7 @@ export async function fetchPasskeysAction() {
         credentialDeviceType: true,
         credentialBackedUp: true,
         transports: true,
+        enabled: true,
       },
     });
 
@@ -162,6 +163,24 @@ export async function deletePasskeyAction(id: string) {
 }
 
 /**
+ * Toggle a passkey's enabled state
+ */
+export async function togglePasskeyAction(id: string, enabled: boolean) {
+  const userId = await getSessionUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.authenticator.update({
+      where: { id },
+      data: { enabled },
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Failed to toggle passkey" };
+  }
+}
+
+/**
  * Toggle 2FA
  */
 export async function toggleTwoFactorAction(enabled: boolean) {
@@ -169,11 +188,12 @@ export async function toggleTwoFactorAction(enabled: boolean) {
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // If enabling, check if user has at least one passkey
+    // If enabling, check if user has at least one passkey or TOTP
     if (enabled) {
-      const count = await prisma.authenticator.count({ where: { userId } });
-      if (count === 0) {
-        return { success: false, error: "You must register at least one Passkey first." };
+      const pkCount = await prisma.authenticator.count({ where: { userId } });
+      const totpCount = await prisma.totpAuthenticator.count({ where: { userId, enabled: true } });
+      if (pkCount === 0 && totpCount === 0) {
+        return { success: false, error: "You must register at least one Passkey or Authenticator App first." };
       }
     }
 
@@ -226,9 +246,9 @@ export async function generateAuthenticationOptionsAction(email?: string) {
   const user = await prisma.user.findFirst({
     where: { 
       email: targetEmail,
-      authenticators: { some: {} },
+      authenticators: { some: { enabled: true } },
     },
-    include: { authenticators: true },
+    include: { authenticators: { where: { enabled: true } } },
   });
 
   if (!user || user.authenticators.length === 0) {
@@ -280,20 +300,20 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
   if (loggedInUserId) {
     user = await prisma.user.findUnique({
       where: { id: loggedInUserId },
-      include: { authenticators: true, Role: true },
+      include: { authenticators: { where: { enabled: true } }, Role: true },
     });
   } else if (authEmail) {
     user = await prisma.user.findFirst({
-      where: { email: authEmail, authenticators: { some: {} } },
-      include: { authenticators: true, Role: true },
+      where: { email: authEmail, authenticators: { some: { enabled: true } } },
+      include: { authenticators: { where: { enabled: true } }, Role: true },
     });
   }
 
   // Fallback for Discoverable Credentials: find user by credentialId
   if (!user) {
     user = await prisma.user.findFirst({
-      where: { authenticators: { some: { credentialID: body.id } } },
-      include: { authenticators: true, Role: true },
+      where: { authenticators: { some: { credentialID: body.id, enabled: true } } },
+      include: { authenticators: { where: { enabled: true } }, Role: true },
     });
   }
 

@@ -11,13 +11,15 @@ import {
   verifyRegistrationAction, 
   fetchPasskeysAction, 
   deletePasskeyAction,
-  toggleTwoFactorAction
+  toggleTwoFactorAction,
+  togglePasskeyAction
 } from "@/app/actions/webauthn";
 import {
   generateTOTPSetup,
   verifyAndEnableTOTP,
   deleteTOTP,
   fetchTOTPList,
+  toggleTOTPAction,
 } from "@/app/actions/totp";
 
 export function SecuritySettings({ user: initialUser }: { user: any }) {
@@ -139,6 +141,26 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
     const result = await deletePasskeyAction(id);
     if (result.success) { toast.success("Passkey deleted."); loadPasskeys(); }
     else toast.error(result.error);
+  };
+
+  const handleTogglePasskey = async (id: string, enabled: boolean) => {
+    // Optimistic update
+    setPasskeys(prev => prev.map(p => p.id === id ? { ...p, enabled } : p));
+    const result = await togglePasskeyAction(id, enabled);
+    if (!result.success) {
+      toast.error(result.error || "Failed to toggle passkey");
+      loadPasskeys();
+    }
+  };
+
+  const handleToggleTOTP = async (id: string, enabled: boolean) => {
+    // Optimistic update
+    setTotpList(prev => prev.map(t => t.id === id ? { ...t, enabled } : t));
+    const result = await toggleTOTPAction(id, enabled);
+    if (!result.success) {
+      toast.error(result.error || "Failed to toggle authenticator");
+      loadTOTPList();
+    }
   };
 
   const handleToggle2FA = async () => {
@@ -296,14 +318,14 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
             <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Authenticator Apps</h4>
             {totpLoading ? (
               <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-emerald-600" /></div>
-            ) : totpList.filter(t => t.enabled).length === 0 ? (
+            ) : totpList.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed rounded-2xl border-muted">
                 <Smartphone className="h-10 w-10 mx-auto text-muted mb-2 opacity-20" />
                 <p className="text-sm text-muted-foreground">No authenticator apps configured.</p>
               </div>
             ) : (
               <div className="grid gap-3">
-                {totpList.filter(t => t.enabled).map((totp) => (
+                {totpList.map((totp) => (
                   <div key={totp.id} className="flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 group hover:border-emerald-500/30 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
@@ -313,14 +335,21 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
                         <p className="font-bold text-sm">{totp.name}</p>
                         <p className="text-[10px] text-muted-foreground">
                           Added {new Date(totp.createdAt).toLocaleDateString()}
-                          <span className="ml-2 text-green-600 font-bold">● Active</span>
+                          <span className={`ml-2 font-bold ${totp.enabled ? "text-green-600" : "text-muted-foreground"}`}>
+                            ● {totp.enabled ? "Active" : "Disabled"}
+                          </span>
                         </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTOTP(totp.id)}
-                      className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleToggleTOTP(totp.id, !totp.enabled)} className="text-muted-foreground hover:scale-110 transition-transform">
+                        {totp.enabled ? <ToggleRight className="h-8 w-8 text-emerald-600" /> : <ToggleLeft className="h-8 w-8" />}
+                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteTOTP(totp.id)}
+                        className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -347,13 +376,18 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
                       </div>
                       <div>
                         <p className="font-bold text-sm">Passkey ({pk.credentialDeviceType})</p>
-                        <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px]">{pk.credentialID}</p>
+                        <p className="text-[10px] w-[180px] sm:w-[250px] text-muted-foreground font-mono truncate">{pk.credentialID}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeletePasskey(pk.id)}
-                      className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleTogglePasskey(pk.id, !pk.enabled)} className="text-muted-foreground hover:scale-110 transition-transform">
+                        {pk.enabled ? <ToggleRight className="h-8 w-8 text-primary" /> : <ToggleLeft className="h-8 w-8" />}
+                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeletePasskey(pk.id)}
+                        className="text-muted-foreground hover:text-red-500 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
