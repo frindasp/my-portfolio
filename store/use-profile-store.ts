@@ -6,6 +6,10 @@ type Tab = "general" | "security";
 interface ProfileState {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  mfaDismissedToday: boolean;
+  setMfaDismissedToday: (val: boolean) => void;
+  // Store the date of dismissal to verify if it's still today
+  mfaDismissedDate: string | null;
 }
 
 export const useProfileStore = create<ProfileState>()(
@@ -13,10 +17,19 @@ export const useProfileStore = create<ProfileState>()(
     (set) => ({
       activeTab: "general",
       setActiveTab: (tab: Tab) => set({ activeTab: tab }),
+      mfaDismissedToday: false,
+      mfaDismissedDate: null,
+      setMfaDismissedToday: (val) => {
+        const today = new Date().toDateString();
+        set({ 
+          mfaDismissedToday: val, 
+          mfaDismissedDate: val ? today : null 
+        });
+      },
     }),
     {
-      name: 'profile-settings-storage', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+      name: 'profile-settings-storage',
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

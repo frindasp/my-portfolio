@@ -122,6 +122,25 @@ export async function loginWithPassword(email: string, password: string) {
       path: "/",
     });
 
+    // Determine if we should show the MFA Enrollment popup
+    let showMfaEnrollment = false;
+    if (!user.twoFactorEnabled) {
+      if (!user.mfaDismissedAt) {
+        showMfaEnrollment = true;
+      } else {
+        const lastDismissed = new Date(user.mfaDismissedAt);
+        const today = new Date();
+        // If not same day (year/month/date), show again
+        if (
+          lastDismissed.getFullYear() !== today.getFullYear() ||
+          lastDismissed.getMonth() !== today.getMonth() ||
+          lastDismissed.getDate() !== today.getDate()
+        ) {
+          showMfaEnrollment = true;
+        }
+      }
+    }
+
     return {
       success: true,
       user: {
@@ -129,6 +148,7 @@ export async function loginWithPassword(email: string, password: string) {
         name: user.name,
         email: user.email,
         role: user.Role.name,
+        showMfaEnrollment,
       },
     };
   } catch (error) {

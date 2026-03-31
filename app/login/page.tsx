@@ -14,12 +14,14 @@ import {
 } from "@/app/actions/messaging";
 import { 
   generateAuthenticationOptionsAction, 
-  verifyAuthenticationAction 
+  verifyAuthenticationAction,
+  dismissMfaReminderAction
 } from "@/app/actions/webauthn";
 import { verifyTOTPCode } from "@/app/actions/totp";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint, Smartphone } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint, Smartphone, ChevronRight, X, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfileStore } from "@/store/use-profile-store";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -29,7 +31,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [otp, setOtp] = useState("");
-  const [mode, setMode] = useState<"password" | "otp" | "forgot" | "passkey-2fa">("otp");
+  const [mode, setMode] = useState<"password" | "otp" | "forgot" | "passkey-2fa">("password");
   const [step, setStep] = useState(1); // 1: Input, 2: Verification
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -39,7 +41,22 @@ function LoginForm() {
 
   const [isNewUserFromContact, setIsNewUserFromContact] = useState(false);
   const [totp2faUserId, setTotp2faUserId] = useState("");
+  
+  // MFA Sub-steps: "choice", "totp", "admin-otp"
+  const [mfaSubStep, setMfaSubStep] = useState<"choice" | "totp" | "admin-otp">("choice");
   const [isAdminOtpRequested, setIsAdminOtpRequested] = useState(false);
+
+  // MFA Enrollment Prompt
+  const { mfaDismissedToday, mfaDismissedDate, setMfaDismissedToday, setActiveTab } = useProfileStore();
+  const [showMfaPrompt, setShowMfaPrompt] = useState(false);
+  const [dontRemindToday, setDontRemindToday] = useState(false);
+
+  useEffect(() => {
+    // Check if store's dismissal was from a prior day
+    if (mfaDismissedDate && mfaDismissedDate !== new Date().toDateString()) {
+      setMfaDismissedToday(false);
+    }
+  }, [mfaDismissedDate, setMfaDismissedToday]);
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -61,14 +78,21 @@ function LoginForm() {
       const res = await loginWithPassword(email, password);
       if (res.success) {
         if (res.requires2FA) {
-          toast.info("Verification required.");
+          toast.info("Security verification required.");
           setMode("passkey-2fa");
           setStep(2);
+          setMfaSubStep("choice");
           if (res.userId) setTotp2faUserId(res.userId);
         } else {
-          toast.success("Welcome back!");
-          router.push("/dashboard");
-          router.refresh();
+          // No MFA required, check if we should show enrollment prompt
+           const shouldPrompt = (res.user as any).showMfaEnrollment && !mfaDismissedToday;
+           if (shouldPrompt) {
+             setShowMfaPrompt(true);
+           } else {
+             toast.success("Welcome back!");
+             router.push("/dashboard");
+             router.refresh();
+           }
         }
       } else {
         toast.error(res.error || "Login failed");
@@ -80,7 +104,7 @@ function LoginForm() {
     }
   };
 
-  // Handle Passkey Authentication (Generic for 2FA, Login, or Forgot Password Bypass)
+  // Handle Passkey Authentication
   const handlePasskeyAuth = async (targetEmail?: string) => {
     const mailToUse = targetEmail || email;
     if (!mailToUse) {
@@ -114,7 +138,7 @@ function LoginForm() {
     }
   };
 
-  // Handle OTP Request
+  // Handle OTP Request (Standard flow)
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
@@ -123,14 +147,11 @@ function LoginForm() {
       const res = await sendVerificationOTP(email);
       if (res.success) {
         toast.success(res.message || "OTP generated! Please ask admin for your code.");
-        
-        // Flag for transition from Contact -> register as User
         if (!(res as any).isRegistered && (res as any).isContact) {
           setIsNewUserFromContact(true);
         } else {
           setIsNewUserFromContact(false);
         }
-
         setStep(2);
         setCountdown(60);
       } else {
@@ -143,18 +164,11 @@ function LoginForm() {
     }
   };
 
-  // Handle OTP Verification
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle OTP Verification (Standard & Admin 2FA)
+  const handleVerifyOTP = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!otp || otp.length < 6) return;
-    if (isNewUserFromContact && (!password || !confirmNewPassword)) {
-      toast.error("Please set a password for your account");
-      return;
-    }
-    if (isNewUserFromContact && password !== confirmNewPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    
     setLoading(true);
     try {
       const res = await verifyOTPAndLogin(email, otp, isNewUserFromContact ? password : undefined);
@@ -167,6 +181,26 @@ function LoginForm() {
       }
     } catch (err) {
       toast.error("Verification failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle TOTP Verification (2FA)
+  const handleVerifyTOTP = async () => {
+    if (!otp || otp.length < 6) return;
+    setLoading(true);
+    try {
+      const res = await verifyTOTPCode(totp2faUserId, otp);
+      if (res.success) {
+        toast.success("Verified successfully!");
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        toast.error(res.error || "Invalid authenticator code");
+      }
+    } catch (err) {
+      toast.error("Failed to verify code");
     } finally {
       setLoading(false);
     }
@@ -239,15 +273,92 @@ function LoginForm() {
     }
   };
 
+  const requestAdminOtp = async () => {
+    setLoading(true);
+    try {
+      const res = await sendVerificationOTP(email);
+      if (res.success) {
+        toast.success("OTP requested from admin!");
+        setIsAdminOtpRequested(true);
+        setMfaSubStep("admin-otp");
+        setCountdown(60);
+        setOtp("");
+      } else {
+        toast.error(res.error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipMfa = async () => {
+    if (dontRemindToday) {
+      await dismissMfaReminderAction(); // Update DB
+      setMfaDismissedToday(true); // Update Local Store
+    }
+    toast.success("Welcome back!");
+    router.push("/dashboard");
+    router.refresh();
+  };
+
+  const handleActivateMfaNow = () => {
+    setActiveTab("security");
+    router.push("/dashboard/profile");
+    router.refresh();
+  };
+
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
+    <div className="min-h-[80vh] flex items-center justify-center p-4 relative">
+      {/* MFA Enrollment Prompt Overlay */}
+      {showMfaPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="w-full max-w-sm bg-card border-2 border-primary/20 rounded-[32px] shadow-2xl p-8 space-y-6 animate-in zoom-in-95 duration-300">
+              <div className="text-center space-y-4">
+                 <div className="mx-auto w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-600">
+                    <ShieldAlert className="h-10 w-10" />
+                 </div>
+                 <div>
+                    <h3 className="text-xl font-black italic uppercase tracking-tight">Boost Security</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed px-2">
+                       Two-Factor Authentication (2FA) adds an extra layer of security. We highly recommend activating it.
+                    </p>
+                 </div>
+              </div>
+
+              <div className="space-y-3">
+                 <Button onClick={handleActivateMfaNow} className="w-full h-12 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+                    Enable 2FA Now
+                 </Button>
+                 <Button variant="ghost" onClick={handleSkipMfa} className="w-full h-12 rounded-2xl font-bold text-muted-foreground hover:bg-muted">
+                    Skip for Now
+                 </Button>
+              </div>
+
+              <label className="flex items-center justify-center gap-2 cursor-pointer group select-none">
+                 <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      checked={dontRemindToday} 
+                      onChange={(e) => setDontRemindToday(e.target.checked)} 
+                      className="peer sr-only" 
+                    />
+                    <div className="h-4 w-4 rounded border border-muted-foreground/30 peer-checked:bg-primary peer-checked:border-primary transition-all group-hover:border-primary/50"></div>
+                    <X className="absolute inset-0 h-4 w-4 text-white scale-0 peer-checked:scale-75 transition-transform" />
+                 </div>
+                 <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground group-hover:text-foreground">Don&apos;t remind me today</span>
+              </label>
+           </div>
+        </div>
+      )}
       <div className="w-full max-w-md bg-card border rounded-3xl shadow-2xl p-8 space-y-8 animate-in fade-in zoom-in duration-500">
+        
+        {/* Header Section */}
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4 transition-transform hover:scale-110">
             {mode === "otp" && (step === 1 ? <Mail className="h-8 w-8 text-primary" /> : <ShieldCheck className="h-8 w-8 text-primary" />)}
             {mode === "password" && <Lock className="h-8 w-8 text-primary" />}
             {mode === "forgot" && <Key className="h-8 w-8 text-primary" />}
-            {mode === "passkey-2fa" && <Fingerprint className="h-8 w-8 text-primary animate-pulse" />}
+            {mode === "passkey-2fa" && <ShieldCheck className="h-8 w-8 text-primary animate-pulse" />}
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight">
             {mode === "forgot" ? "Reset Password" : mode === "passkey-2fa" ? "Verification" : "Welcome Back"}
@@ -256,11 +367,15 @@ function LoginForm() {
              {mode === "otp" && (step === 1 ? "Sign in with a one-time code." : isNewUserFromContact ? "Finish your registration." : `Confirm code sent to ${email}`)}
              {mode === "password" && "Enter your credentials to continue."}
              {mode === "forgot" && (step === 1 ? "Enter your email for the reset code." : "Enter code and new password.")}
-             {mode === "passkey-2fa" && "Please use your Passkey to confirm it's you."}
+             {mode === "passkey-2fa" && (
+                mfaSubStep === "choice" ? "Choose how you want to verify your identity." : 
+                mfaSubStep === "totp" ? "Enter the code from your authenticator app." :
+                "Contact admin to get your verification code."
+             )}
           </p>
         </div>
 
-        {/* STEP 1: Inputs */}
+        {/* STEP 1: Login Inputs */}
         {step === 1 ? (
           <div className="space-y-6">
             <form onSubmit={mode === "password" ? handlePasswordLogin : mode === "otp" ? handleRequestOTP : handleForgotPassword} className="space-y-4">
@@ -288,7 +403,6 @@ function LoginForm() {
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
-                      aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -296,8 +410,8 @@ function LoginForm() {
                 </div>
               )}
 
-              <div className="space-y-3">
-                <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20" disabled={loading || !email}>
+              <div className="space-y-3 pt-2">
+                <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]" disabled={loading || !email}>
                   {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (mode === "password" ? "Sign In" : "Send Code")}
                 </Button>
                 
@@ -314,169 +428,149 @@ function LoginForm() {
                 )}
               </div>
             </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
-              <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Atau</span></div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-               <Button variant="outline" className={cn("rounded-xl h-12 text-xs font-bold", mode === "otp" && "border-primary text-primary bg-primary/5")} onClick={() => setMode("otp")}>OTP Email</Button>
-               <Button variant="outline" className={cn("rounded-xl h-12 text-xs font-bold", mode === "password" && "border-primary text-primary bg-primary/5")} onClick={() => setMode("password")}>Password</Button>
-            </div>
-            
-            <Button 
-               variant="ghost" 
-               onClick={() => handlePasskeyAuth()}
-               className="w-full h-12 rounded-xl text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
-               disabled={loading}
-            >
-               <Fingerprint className="mr-2 h-4 w-4" /> Sign In with Passkey
-            </Button>
-
           </div>
         ) : (
-          /* STEP 2: Verification/Reset/Passkey-2FA */
+          /* STEP 2: MFA/OTP/Reset Flows */
           <div className="space-y-6">
             {mode === "passkey-2fa" ? (
-              <div className="space-y-6 text-center">
-                <p className="text-sm text-muted-foreground">Select your preferred verification method to finish logging in.</p>
-                
-                <div className="space-y-5">
-                  {/* Admin OTP Option */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">OTP Code (Request Admin)</label>
-                    <div className="flex gap-2">
-                       {!isAdminOtpRequested ? (
-                         <Button
-                           type="button"
-                           onClick={async () => {
-                             setLoading(true);
-                             try {
-                               const res = await sendVerificationOTP(email);
-                               if (res.success) {
-                                  toast.success("OTP requested from admin!");
-                                  setIsAdminOtpRequested(true);
-                                  setCountdown(60);
-                               } else toast.error(res.error);
-                             } finally { setLoading(false); }
-                           }}
-                           className="w-full h-12 rounded-xl text-xs font-bold border-muted-foreground/20 text-muted-foreground hover:bg-muted/50"
-                           variant="outline"
-                           disabled={loading}
-                         >
-                           Request OTP from Admin
-                         </Button>
-                       ) : (
-                         <div className="w-full space-y-3">
-                            <Input 
-                              type="text" 
-                              maxLength={6} 
-                              value={otp} 
-                              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
-                              placeholder="000000"
-                              className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
-                              disabled={loading} 
-                              autoFocus 
-                            />
-                            <Button 
-                              type="button"
-                              onClick={async () => {
-                                if (!otp || otp.length < 6) return;
-                                setLoading(true);
-                                try {
-                                  // verifyOTPAndLogin handles session and redirect
-                                  const res = await verifyOTPAndLogin(email, otp);
-                                  if (res.success) {
-                                    toast.success("Verified successfully!");
-                                    router.push("/dashboard");
-                                    router.refresh();
-                                  } else toast.error(res.error || "Invalid OTP");
-                                } finally { setLoading(false); }
-                              }}
-                              className="w-full h-12 rounded-xl font-bold bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-500/20" 
-                              disabled={loading || otp.length < 6}
-                            >
-                              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />} Verify Admin OTP
-                            </Button>
-                            <button
-                               type="button"
-                               onClick={() => setIsAdminOtpRequested(false)}
-                               className="text-[10px] text-muted-foreground hover:text-foreground font-bold"
-                            >
-                               Change back to Authenticator/Passkey
-                            </button>
-                         </div>
-                       )}
-                    </div>
-                  </div>
+              <div className="space-y-6">
+                {/* CHOICE VIEW */}
+                {mfaSubStep === "choice" && (
+                  <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-300">
+                    <button 
+                      onClick={() => setMfaSubStep("totp")}
+                      className="w-full flex items-center justify-between p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/40 hover:bg-emerald-500/10 transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                          <Smartphone className="h-6 w-6" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold">Authenticator App</p>
+                          <p className="text-[10px] text-muted-foreground">Google, Microsoft, etc.</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    </button>
 
-                  <div className="relative py-2">
-                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
-                    <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Or</span></div>
-                  </div>
+                    <button 
+                      onClick={requestAdminOtp}
+                      className="w-full flex items-center justify-between p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 hover:border-amber-500/40 hover:bg-amber-500/10 transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                          <Mail className="h-6 w-6" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold">OTP to Admin</p>
+                          <p className="text-[10px] text-muted-foreground">Ask support for a code</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    </button>
 
-                  {!isAdminOtpRequested && (
-                    <>
-                      {/* TOTP Option */}
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authenticator App Code</label>
+                    <button 
+                      onClick={() => handlePasskeyAuth()}
+                      className="w-full flex items-center justify-between p-5 rounded-2xl bg-primary/5 border border-primary/10 hover:border-primary/40 hover:bg-primary/10 transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                          <Fingerprint className="h-6 w-6" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold">Passkey</p>
+                          <p className="text-[10px] text-muted-foreground">Biometric / Security Key</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    </button>
+
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { setMode("password"); setStep(1); }} 
+                      className="w-full text-[10px] font-bold text-muted-foreground mt-4"
+                    >
+                      <ArrowLeft className="h-3 w-3 mr-1" /> Logout and try again
+                    </Button>
+                  </div>
+                )}
+
+                {/* TOTP VIEW */}
+                {mfaSubStep === "totp" && (
+                   <div className="space-y-6 animate-in zoom-in-95 duration-200">
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">6-Digit Code</label>
                         <Input 
                           type="text" 
                           maxLength={6} 
                           value={otp} 
                           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
                           placeholder="000000"
-                          className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
+                          className="rounded-xl h-14 text-center text-3xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
                           disabled={loading} 
                           autoFocus 
                         />
                         <Button 
-                          type="button"
-                          onClick={async () => {
-                            if (!otp || otp.length < 6) return;
-                            setLoading(true);
-                            try {
-                              const res = await verifyTOTPCode(totp2faUserId, otp);
-                              if (res.success) {
-                                toast.success("Verified successfully!");
-                                router.push("/dashboard");
-                                router.refresh();
-                              } else {
-                                toast.error(res.error || "Invalid authenticator code");
-                              }
-                            } catch (err) {
-                              toast.error("Failed to verify code");
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
-                          className="w-full h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" 
+                          onClick={handleVerifyTOTP}
                           disabled={loading || otp.length < 6}
+                          className="w-full h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
                         >
-                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />} Verify TOTP Code
+                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />} Verify Code
                         </Button>
                       </div>
+                      <button 
+                        onClick={() => { setMfaSubStep("choice"); setOtp(""); }}
+                        className="w-full text-xs font-bold text-primary hover:underline flex items-center justify-center"
+                      >
+                         <ArrowLeft className="h-3 w-3 mr-1" /> Choose different method
+                      </button>
+                   </div>
+                )}
 
-                      <div className="relative py-2">
-                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
-                        <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Or</span></div>
+                {/* ADMIN OTP VIEW */}
+                {mfaSubStep === "admin-otp" && (
+                   <div className="space-y-6 animate-in zoom-in-95 duration-200">
+                      <div className="space-y-4 text-center">
+                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Waiting for Admin Code</p>
+                        <Input 
+                          type="text" 
+                          maxLength={6} 
+                          value={otp} 
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
+                          placeholder="000000"
+                          className="rounded-xl h-14 text-center text-3xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
+                          disabled={loading} 
+                          autoFocus 
+                        />
+                        <Button 
+                          onClick={() => handleVerifyOTP()}
+                          disabled={loading || otp.length < 6}
+                          className="w-full h-12 rounded-xl font-bold bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-500/20"
+                        >
+                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />} Login with Admin OTP
+                        </Button>
+                        
+                        <div className="pt-2">
+                           <button 
+                             onClick={requestAdminOtp} 
+                             disabled={countdown > 0} 
+                             className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                           >
+                             {countdown > 0 ? `Resend request in ${countdown}s` : "Didn't get code? Resend request"}
+                           </button>
+                        </div>
                       </div>
-
-                      {/* Passkey Option */}
-                      <Button type="button" onClick={() => handlePasskeyAuth()} variant="outline" className="w-full h-12 rounded-xl font-bold border-primary text-primary hover:bg-primary/5 shadow-sm" disabled={loading}>
-                        <Fingerprint className="mr-2 h-5 w-5" /> Use Passkey
-                      </Button>
-                    </>
-                  )}
-
-                </div>
-
-                <button type="button" onClick={() => { setMode("password"); setStep(1); setOtp(""); }} className="text-[10px] text-muted-foreground hover:text-primary font-bold mt-4 block mx-auto underline-offset-2 hover:underline">
-                  Cancel and use other method
-                </button>
+                      <button 
+                        onClick={() => { setMfaSubStep("choice"); setOtp(""); }}
+                        className="w-full text-xs font-bold text-primary hover:underline flex items-center justify-center"
+                      >
+                         <ArrowLeft className="h-3 w-3 mr-1" /> Choose different method
+                      </button>
+                   </div>
+                )}
               </div>
             ) : (
+              /* Standard OTP / Forgot Password Form */
               <form onSubmit={mode === "forgot" ? handleResetPassword : handleVerifyOTP} className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center ml-1">
@@ -504,7 +598,6 @@ function LoginForm() {
                           type="button"
                           onClick={() => setShowNewPassword((prev) => !prev)}
                           className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
-                          aria-label={showNewPassword ? "Sembunyikan password" : "Lihat password"}
                         >
                           {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -528,7 +621,6 @@ function LoginForm() {
                           type="button"
                           onClick={() => setShowConfirmNewPassword((prev) => !prev)}
                           className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
-                          aria-label={showConfirmNewPassword ? "Sembunyikan konfirmasi password" : "Lihat konfirmasi password"}
                         >
                           {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -564,4 +656,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

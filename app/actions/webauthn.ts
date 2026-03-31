@@ -181,6 +181,24 @@ export async function togglePasskeyAction(id: string, enabled: boolean) {
 }
 
 /**
+ * Dismiss the MFA enrollment reminder for today
+ */
+export async function dismissMfaReminderAction() {
+  const userId = await getSessionUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { mfaDismissedAt: new Date() },
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Failed to dismiss reminder" };
+  }
+}
+
+/**
  * Toggle 2FA
  */
 export async function toggleTwoFactorAction(enabled: boolean) {
