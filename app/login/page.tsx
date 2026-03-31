@@ -16,8 +16,9 @@ import {
   generateAuthenticationOptionsAction, 
   verifyAuthenticationAction 
 } from "@/app/actions/webauthn";
+import { verifyTOTPCode } from "@/app/actions/totp";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function LoginForm() {
@@ -37,6 +38,7 @@ function LoginForm() {
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   const [isNewUserFromContact, setIsNewUserFromContact] = useState(false);
+  const [totp2faUserId, setTotp2faUserId] = useState("");
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -58,11 +60,10 @@ function LoginForm() {
       const res = await loginWithPassword(email, password);
       if (res.success) {
         if (res.requires2FA) {
-          toast.info("Passkey verification required.");
+          toast.info("Verification required.");
           setMode("passkey-2fa");
           setStep(2);
-          // Automatically trigger passkey if possible
-          handlePasskeyAuth(email);
+          if (res.userId) setTotp2faUserId(res.userId);
         } else {
           toast.success("Welcome back!");
           router.push("/dashboard");
@@ -338,16 +339,61 @@ function LoginForm() {
           <div className="space-y-6">
             {mode === "passkey-2fa" ? (
               <div className="space-y-6 text-center">
-                <p className="text-sm text-muted-foreground">Please use your hardware security key, fingerprint, or face recognition to finish logging in.</p>
-                <div className="flex justify-center py-4">
-                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
-                    <Fingerprint className="h-10 w-10 text-primary" />
+                <p className="text-sm text-muted-foreground">Select your preferred verification method to finish logging in.</p>
+                
+                <div className="space-y-5">
+                  {/* TOTP Option */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authenticator App Code</label>
+                    <Input 
+                      type="text" 
+                      maxLength={6} 
+                      value={otp} 
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
+                      placeholder="000000"
+                      className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
+                      disabled={loading} 
+                      autoFocus 
+                    />
+                    <Button 
+                      type="button"
+                      onClick={async () => {
+                        if (!otp || otp.length < 6) return;
+                        setLoading(true);
+                        try {
+                          const res = await verifyTOTPCode(totp2faUserId, otp);
+                          if (res.success) {
+                            toast.success("Verified successfully!");
+                            router.push("/dashboard");
+                            router.refresh();
+                          } else {
+                            toast.error(res.error || "Invalid authenticator code");
+                          }
+                        } catch (err) {
+                          toast.error("Failed to verify code");
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="w-full h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" 
+                      disabled={loading || otp.length < 6}
+                    >
+                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />} Verify Code
+                    </Button>
                   </div>
+
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
+                    <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Or</span></div>
+                  </div>
+
+                  {/* Passkey Option */}
+                  <Button type="button" onClick={() => handlePasskeyAuth()} variant="outline" className="w-full h-12 rounded-xl font-bold border-primary text-primary hover:bg-primary/5 shadow-sm" disabled={loading}>
+                    <Fingerprint className="mr-2 h-5 w-5" /> Use Passkey
+                  </Button>
                 </div>
-                <Button onClick={() => handlePasskeyAuth()} className="w-full h-12 rounded-xl font-bold" disabled={loading}>
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Use Passkey Now"}
-                </Button>
-                <button onClick={() => { setMode("password"); setStep(1); }} className="text-[10px] text-muted-foreground hover:text-primary font-bold">
+
+                <button type="button" onClick={() => { setMode("password"); setStep(1); setOtp(""); }} className="text-[10px] text-muted-foreground hover:text-primary font-bold mt-4 block mx-auto underline-offset-2 hover:underline">
                   Cancel and use other method
                 </button>
               </div>

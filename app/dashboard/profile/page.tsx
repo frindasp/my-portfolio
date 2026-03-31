@@ -9,17 +9,21 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { SecuritySettings } from "@/components/SecuritySettings";
 
+import { useProfileStore } from "@/store/use-profile-store";
+
 type Tab = "general" | "security";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [fullName, setFullName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const { activeTab, setActiveTab } = useProfileStore();
   const router = useRouter();
 
   useEffect(() => {
+    setIsHydrated(true);
     const loadProfile = async () => {
       const u = await getCurrentUser();
       setUser(u);
@@ -56,7 +60,7 @@ export default function ProfilePage() {
     toast.success("Full name updated.");
   };
 
-  if (loading) return (
+  if (!isHydrated || loading) return (
      <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm font-bold tracking-widest uppercase opacity-40 italic">Syncing Profile...</p>

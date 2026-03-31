@@ -34,20 +34,34 @@ model Role {
 }
 
 model User {
-  id               String          @id @default(cuid())
+  id               String              @id @default(cuid())
   name             String?
   email            String
   password         String
   roleId           String
-  twoFactorEnabled Boolean         @default(false)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  twoFactorEnabled Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   Messages         Message[]
-  Role             Role            @relation(fields: [roleId], references: [id])
+  Role             Role                @relation(fields: [roleId], references: [id])
   authenticators   Authenticator[]
+  totp             TotpAuthenticator[]
 
   @@unique([email, roleId])
   @@index([roleId], map: "User_roleId_fkey")
+}
+
+model TotpAuthenticator {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @default("Authenticator")
+  secret    String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Authenticator {

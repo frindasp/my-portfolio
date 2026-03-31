@@ -221,8 +221,13 @@ export async function generateAuthenticationOptionsAction(email?: string) {
 
   if (!targetEmail) return { success: false, error: "Email is required for this operation." };
 
+  // Find user that actually has authenticators registered
+  // (email is not unique alone — it's unique per roleId, so there could be multiple user records)
   const user = await prisma.user.findFirst({
-    where: { email: targetEmail },
+    where: { 
+      email: targetEmail,
+      authenticators: { some: {} },
+    },
     include: { authenticators: true },
   });
 
@@ -279,7 +284,7 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
     });
   } else if (authEmail) {
     user = await prisma.user.findFirst({
-      where: { email: authEmail },
+      where: { email: authEmail, authenticators: { some: {} } },
       include: { authenticators: true, Role: true },
     });
   }

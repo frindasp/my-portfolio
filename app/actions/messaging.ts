@@ -18,7 +18,7 @@ export async function checkEmailStatus(email: string) {
   });
 
   const userRole = await getOrCreateRole("User");
-  
+
   // Use email_roleId compound unique as defined in schema
   const registeredUser = await prisma.user.findUnique({
     where: {
@@ -39,38 +39,41 @@ export async function checkEmailStatus(email: string) {
 /**
  * Send OTP for email verification / Login
  */
-export async function sendVerificationOTP(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function sendVerificationOTP(
+  email: string,
+): Promise<{ success: boolean; message?: string; error?: string }> {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   try {
     const userRole = await getOrCreateRole("User");
     const user = await prisma.user.findUnique({
-      where: { email_roleId: { email, roleId: userRole.id } }
+      where: { email_roleId: { email, roleId: userRole.id } },
     });
 
     const isContact = await prisma.contact.findFirst({
-      where: { email }
+      where: { email },
     });
 
     // Upsert token in VerificationToken model
     await prisma.verificationToken.upsert({
       where: { email_token: { email, token: otp } },
-      update: { 
+      update: {
         expires,
       },
-      create: { 
-        email, 
-        token: otp, 
+      create: {
+        email,
+        token: otp,
         expires,
       },
     });
 
-    return { 
-      success: true, 
-      message: "Verification code generated. Please contact admin for your code.",
+    return {
+      success: true,
+      message:
+        "Verification code generated. Please contact admin for your code.",
       isRegistered: !!user,
-      isContact: !!isContact
+      isContact: !!isContact,
     } as any;
   } catch (err) {
     console.error("sendVerificationOTP error:", err);
@@ -82,28 +85,31 @@ export async function sendVerificationOTP(email: string): Promise<{ success: boo
  * Login with Password
  */
 export async function loginWithPassword(email: string, password: string) {
-  if (!email || !password) return { success: false, error: "Email and password are required" };
+  if (!email || !password)
+    return { success: false, error: "Email and password are required" };
 
   try {
     const userRole = await getOrCreateRole("User");
     const user = await prisma.user.findUnique({
       where: {
-        email_roleId: { email, roleId: userRole.id }
+        email_roleId: { email, roleId: userRole.id },
       },
-      include: { Role: true }
+      include: { Role: true },
     });
 
-    if (!user) return { success: false, error: "Account not found or invalid password" };
+    if (!user)
+      return { success: false, error: "Account not found or invalid password" };
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) return { success: false, error: "Invalid password" };
 
     // Check for 2FA
     if (user.twoFactorEnabled) {
-      return { 
-        success: true, 
-        requires2FA: true, 
-        email: user.email 
+      return {
+        success: true,
+        requires2FA: true,
+        email: user.email,
+        userId: user.id,
       };
     }
 
@@ -116,8 +122,15 @@ export async function loginWithPassword(email: string, password: string) {
       path: "/",
     });
 
-    return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.Role.name } };
-
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.Role.name,
+      },
+    };
   } catch (error) {
     console.error("Login Password error:", error);
     return { success: false, error: "Something went wrong" };
@@ -167,7 +180,7 @@ export async function verifyOTPAndLogin(
         name: name || null,
         updatedAt: new Date(),
       },
-      include: { Role: true }
+      include: { Role: true },
     });
   } else {
     // Just find existing user
@@ -175,12 +188,16 @@ export async function verifyOTPAndLogin(
       where: {
         email_roleId: { email, roleId: userRole.id },
       },
-      include: { Role: true }
+      include: { Role: true },
     });
   }
 
   if (!user) {
-    return { success: false, error: "User not found. Please register first.", isContact: !!(await prisma.contact.findFirst({ where: { email } })) };
+    return {
+      success: false,
+      error: "User not found. Please register first.",
+      isContact: !!(await prisma.contact.findFirst({ where: { email } })),
+    };
   }
 
   // --- AUTO MERGING LOGIC ---
@@ -193,7 +210,7 @@ export async function verifyOTPAndLogin(
       },
       data: {
         senderId: user.id,
-      }
+      },
     });
 
     const matchedContacts = await prisma.contact.findMany({
@@ -238,7 +255,12 @@ export async function verifyOTPAndLogin(
 
   return {
     success: true,
-    user: { id: user.id, name: user.name, email: user.email, role: user.Role.name },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.Role.name,
+    },
   };
 }
 
@@ -248,7 +270,7 @@ export async function verifyOTPAndLogin(
 export async function forgotPassword(email: string) {
   const userRole = await getOrCreateRole("User");
   const user = await prisma.user.findFirst({
-    where: { email, roleId: userRole.id }
+    where: { email, roleId: userRole.id },
   });
   if (!user) return { success: false, error: "User not found" };
 
@@ -259,7 +281,11 @@ export async function forgotPassword(email: string) {
 /**
  * Reset Password using OTP
  */
-export async function resetPassword(email: string, token: string, newPw: string) {
+export async function resetPassword(
+  email: string,
+  token: string,
+  newPw: string,
+) {
   const verification = await prisma.verificationToken.findUnique({
     where: { email_token: { email, token } },
   });
@@ -272,7 +298,7 @@ export async function resetPassword(email: string, token: string, newPw: string)
   const hashedPassword = await bcrypt.hash(newPw, 10);
   await prisma.user.updateMany({
     where: { email, roleId: userRole.id },
-    data: { password: hashedPassword }
+    data: { password: hashedPassword },
   });
 
   await prisma.verificationToken.delete({ where: { id: verification.id } });
@@ -307,7 +333,13 @@ export async function getMessages(email?: string, userId?: string) {
   const matchedContacts = normalizedEmail
     ? await prisma.contact.findMany({
         where: { email: normalizedEmail },
-        select: { id: true, name: true, email: true, message: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          message: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "asc" },
       })
     : [];
@@ -382,7 +414,9 @@ export async function getMessageOwnershipDiff(email?: string, userId?: string) {
       isAdmin: false,
       OR: [
         { senderEmail: normalizedEmail },
-        ...(contactIdSet.size ? [{ contactId: { in: contactIds }, senderEmail: null }] : []),
+        ...(contactIdSet.size
+          ? [{ contactId: { in: contactIds }, senderEmail: null }]
+          : []),
       ],
       AND: [
         {
@@ -420,7 +454,9 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
       isAdmin: false,
       OR: [
         { senderEmail: normalizedEmail },
-        ...(contactIdSet.size ? [{ contactId: { in: contactIds }, senderEmail: null }] : []),
+        ...(contactIdSet.size
+          ? [{ contactId: { in: contactIds }, senderEmail: null }]
+          : []),
       ],
       AND: [
         {
@@ -451,7 +487,9 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
         .filter((id): id is string => !!id),
     );
 
-    const contactsToMaterialize = matchedContacts.filter((contact) => !existingSet.has(contact.id));
+    const contactsToMaterialize = matchedContacts.filter(
+      (contact) => !existingSet.has(contact.id),
+    );
     if (contactsToMaterialize.length === 0) {
       return { success: true, updatedCount: 0 };
     }
@@ -496,7 +534,9 @@ export async function syncMessageOwnership(email?: string, userId?: string) {
       .map((item) => item.contactId)
       .filter((id): id is string => !!id),
   );
-  const contactsToMaterialize = matchedContacts.filter((contact) => !existingSet.has(contact.id));
+  const contactsToMaterialize = matchedContacts.filter(
+    (contact) => !existingSet.has(contact.id),
+  );
 
   let createdCount = 0;
   if (contactsToMaterialize.length > 0) {
@@ -584,7 +624,11 @@ export async function sendChatMessage(
             { senderEmail: resolvedEmail },
             ...(contactIds.length ? [{ contactId: { in: contactIds } }] : []),
           ],
-          AND: [{ OR: [{ senderId: null }, { senderId: { not: resolvedSenderId } }] }],
+          AND: [
+            {
+              OR: [{ senderId: null }, { senderId: { not: resolvedSenderId } }],
+            },
+          ],
         },
         data: {
           senderId: resolvedSenderId,
