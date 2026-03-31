@@ -44,14 +44,34 @@ export async function sendVerificationOTP(email: string): Promise<{ success: boo
   const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   try {
+    const userRole = await getOrCreateRole("User");
+    const user = await prisma.user.findUnique({
+      where: { email_roleId: { email, roleId: userRole.id } }
+    });
+
+    const isContact = await prisma.contact.findFirst({
+      where: { email }
+    });
+
     // Upsert token in VerificationToken model
     await prisma.verificationToken.upsert({
       where: { email_token: { email, token: otp } },
-      update: { expires },
-      create: { email, token: otp, expires },
+      update: { 
+        expires,
+      },
+      create: { 
+        email, 
+        token: otp, 
+        expires,
+      },
     });
 
-    return { success: true, message: "Verification code generated. Please contact admin for your code." };
+    return { 
+      success: true, 
+      message: "Verification code generated. Please contact admin for your code.",
+      isRegistered: !!user,
+      isContact: !!isContact
+    } as any;
   } catch (err) {
     console.error("sendVerificationOTP error:", err);
     return { success: false, error: "Failed to generate verification code" };
@@ -160,7 +180,7 @@ export async function verifyOTPAndLogin(
   }
 
   if (!user) {
-    return { success: false, error: "User not found. Please register first." };
+    return { success: false, error: "User not found. Please register first.", isContact: !!(await prisma.contact.findFirst({ where: { email } })) };
   }
 
   // --- AUTO MERGING LOGIC ---
