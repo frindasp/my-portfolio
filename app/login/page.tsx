@@ -39,6 +39,7 @@ function LoginForm() {
 
   const [isNewUserFromContact, setIsNewUserFromContact] = useState(false);
   const [totp2faUserId, setTotp2faUserId] = useState("");
+  const [isAdminOtpRequested, setIsAdminOtpRequested] = useState(false);
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -342,44 +343,72 @@ function LoginForm() {
                 <p className="text-sm text-muted-foreground">Select your preferred verification method to finish logging in.</p>
                 
                 <div className="space-y-5">
-                  {/* TOTP Option */}
+                  {/* Admin OTP Option */}
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authenticator App Code</label>
-                    <Input 
-                      type="text" 
-                      maxLength={6} 
-                      value={otp} 
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
-                      placeholder="000000"
-                      className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
-                      disabled={loading} 
-                      autoFocus 
-                    />
-                    <Button 
-                      type="button"
-                      onClick={async () => {
-                        if (!otp || otp.length < 6) return;
-                        setLoading(true);
-                        try {
-                          const res = await verifyTOTPCode(totp2faUserId, otp);
-                          if (res.success) {
-                            toast.success("Verified successfully!");
-                            router.push("/dashboard");
-                            router.refresh();
-                          } else {
-                            toast.error(res.error || "Invalid authenticator code");
-                          }
-                        } catch (err) {
-                          toast.error("Failed to verify code");
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      className="w-full h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" 
-                      disabled={loading || otp.length < 6}
-                    >
-                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />} Verify Code
-                    </Button>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">OTP Code (Request Admin)</label>
+                    <div className="flex gap-2">
+                       {!isAdminOtpRequested ? (
+                         <Button
+                           type="button"
+                           onClick={async () => {
+                             setLoading(true);
+                             try {
+                               const res = await sendVerificationOTP(email);
+                               if (res.success) {
+                                  toast.success("OTP requested from admin!");
+                                  setIsAdminOtpRequested(true);
+                                  setCountdown(60);
+                               } else toast.error(res.error);
+                             } finally { setLoading(false); }
+                           }}
+                           className="w-full h-12 rounded-xl text-xs font-bold border-muted-foreground/20 text-muted-foreground hover:bg-muted/50"
+                           variant="outline"
+                           disabled={loading}
+                         >
+                           Request OTP from Admin
+                         </Button>
+                       ) : (
+                         <div className="w-full space-y-3">
+                            <Input 
+                              type="text" 
+                              maxLength={6} 
+                              value={otp} 
+                              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
+                              placeholder="000000"
+                              className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
+                              disabled={loading} 
+                              autoFocus 
+                            />
+                            <Button 
+                              type="button"
+                              onClick={async () => {
+                                if (!otp || otp.length < 6) return;
+                                setLoading(true);
+                                try {
+                                  // verifyOTPAndLogin handles session and redirect
+                                  const res = await verifyOTPAndLogin(email, otp);
+                                  if (res.success) {
+                                    toast.success("Verified successfully!");
+                                    router.push("/dashboard");
+                                    router.refresh();
+                                  } else toast.error(res.error || "Invalid OTP");
+                                } finally { setLoading(false); }
+                              }}
+                              className="w-full h-12 rounded-xl font-bold bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-500/20" 
+                              disabled={loading || otp.length < 6}
+                            >
+                              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />} Verify Admin OTP
+                            </Button>
+                            <button
+                               type="button"
+                               onClick={() => setIsAdminOtpRequested(false)}
+                               className="text-[10px] text-muted-foreground hover:text-foreground font-bold"
+                            >
+                               Change back to Authenticator/Passkey
+                            </button>
+                         </div>
+                       )}
+                    </div>
                   </div>
 
                   <div className="relative py-2">
@@ -387,10 +416,60 @@ function LoginForm() {
                     <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Or</span></div>
                   </div>
 
-                  {/* Passkey Option */}
-                  <Button type="button" onClick={() => handlePasskeyAuth()} variant="outline" className="w-full h-12 rounded-xl font-bold border-primary text-primary hover:bg-primary/5 shadow-sm" disabled={loading}>
-                    <Fingerprint className="mr-2 h-5 w-5" /> Use Passkey
-                  </Button>
+                  {!isAdminOtpRequested && (
+                    <>
+                      {/* TOTP Option */}
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authenticator App Code</label>
+                        <Input 
+                          type="text" 
+                          maxLength={6} 
+                          value={otp} 
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} 
+                          placeholder="000000"
+                          className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" 
+                          disabled={loading} 
+                          autoFocus 
+                        />
+                        <Button 
+                          type="button"
+                          onClick={async () => {
+                            if (!otp || otp.length < 6) return;
+                            setLoading(true);
+                            try {
+                              const res = await verifyTOTPCode(totp2faUserId, otp);
+                              if (res.success) {
+                                toast.success("Verified successfully!");
+                                router.push("/dashboard");
+                                router.refresh();
+                              } else {
+                                toast.error(res.error || "Invalid authenticator code");
+                              }
+                            } catch (err) {
+                              toast.error("Failed to verify code");
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          className="w-full h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" 
+                          disabled={loading || otp.length < 6}
+                        >
+                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />} Verify TOTP Code
+                        </Button>
+                      </div>
+
+                      <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-muted" /></div>
+                        <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">Or</span></div>
+                      </div>
+
+                      {/* Passkey Option */}
+                      <Button type="button" onClick={() => handlePasskeyAuth()} variant="outline" className="w-full h-12 rounded-xl font-bold border-primary text-primary hover:bg-primary/5 shadow-sm" disabled={loading}>
+                        <Fingerprint className="mr-2 h-5 w-5" /> Use Passkey
+                      </Button>
+                    </>
+                  )}
+
                 </div>
 
                 <button type="button" onClick={() => { setMode("password"); setStep(1); setOtp(""); }} className="text-[10px] text-muted-foreground hover:text-primary font-bold mt-4 block mx-auto underline-offset-2 hover:underline">
