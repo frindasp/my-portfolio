@@ -6,7 +6,10 @@
     "dev": "npx prisma generate && next dev --turbopack -p 5009",
     "build": "npx prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run lint && npm run typecheck",
+    "test:full": "npm run test && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
