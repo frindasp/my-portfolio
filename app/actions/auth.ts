@@ -239,6 +239,21 @@ export async function logout() {
   return { success: true };
 }
 
+export async function getTotalMessageCount() {
+  try {
+    const totalMessages = await prisma.message.count({
+      where: {
+        OR: [{ isAdmin: false }, { isAdmin: true }],
+      },
+    });
+
+    return { success: true, totalMessages };
+  } catch (error) {
+    console.error("Get Total Message Count Error:", error);
+    return { success: false, totalMessages: 0 };
+  }
+}
+
 export async function getCurrentUser() {
   const cookieStore = await cookies();
   const userId = cookieStore.get("portfolio_session")?.value;
