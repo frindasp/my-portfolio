@@ -14,8 +14,7 @@ import {
 } from "@/app/actions/messaging";
 import { 
   generateAuthenticationOptionsAction, 
-  verifyAuthenticationAction,
-  dismissMfaReminderAction
+  verifyAuthenticationAction
 } from "@/app/actions/webauthn";
 import { verifyTOTPCode } from "@/app/actions/totp";
 import { startAuthentication } from "@simplewebauthn/browser";
@@ -285,19 +284,29 @@ function LoginForm() {
 
   const handleSkipMfa = async () => {
     setLoading(true);
-    const dismissResult = await dismissMfaReminderAction();
+    try {
+      const dismissedAt = new Date().toISOString();
+      const response = await fetch("/api/mfa/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dismissedAt }),
+      });
 
-    if (!dismissResult.success) {
-      toast.error(dismissResult.error || "Failed to save reminder preference");
+      const dismissResult = await response.json();
+      if (!response.ok || !dismissResult.success) {
+        toast.error(dismissResult.error || "Failed to save reminder preference");
+        return;
+      }
+
+      setShowMfaPrompt(false);
+      toast.success("Welcome back!");
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      toast.error("Failed to skip MFA reminder");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setShowMfaPrompt(false);
-    toast.success("Welcome back!");
-    router.push("/dashboard");
-    router.refresh();
-    setLoading(false);
   };
 
   const handleActivateMfaNow = () => {
