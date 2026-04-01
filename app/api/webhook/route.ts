@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,14 @@ export async function POST(req: Request) {
         html: htmlStr,
         rawData: payload, // Store the raw JSON payload
       },
+    });
+
+    await logActivity({
+      action: "API_HIT",
+      description: "POST /api/webhook",
+      route: "/api/webhook",
+      method: "POST",
+      metadata: { type: payload.type || "unknown" },
     });
 
     return NextResponse.json({ success: true, message: "Webhook processed and saved" }, { status: 200 });

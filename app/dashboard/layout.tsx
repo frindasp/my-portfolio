@@ -12,7 +12,8 @@ import {
   X, 
   Zap,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout, getCurrentUser } from "@/app/actions/messaging";
@@ -25,6 +26,7 @@ const sidebarItems = [
   { name: "Live Chat (Socket.io)", href: "/dashboard/chat", icon: MessageSquare },
   { name: "Pusher Events", href: "/dashboard/pusher-chat", icon: Zap },
   { name: "Profile", href: "/dashboard/profile", icon: User },
+  { name: "History", href: "/dashboard/history", icon: History },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

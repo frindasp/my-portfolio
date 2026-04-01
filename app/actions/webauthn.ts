@@ -13,6 +13,7 @@ import type {
   AuthenticationResponseJSON,
 } from "@simplewebauthn/types";
 import { isoBase64URL, isoUint8Array } from "@simplewebauthn/server/helpers";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -220,6 +221,14 @@ export async function toggleTwoFactorAction(enabled: boolean) {
       data: { twoFactorEnabled: enabled },
     });
 
+    await logActivity({
+      userId,
+      action: "TWO_FACTOR_UPDATED",
+      description: `Status 2FA diubah menjadi ${enabled ? "aktif" : "nonaktif"}.`,
+      route: "/dashboard/profile",
+      method: "SERVER_ACTION",
+    });
+
     return { success: true };
   } catch (error) {
     return { success: false, error: "Failed to update 2FA status" };
@@ -376,6 +385,14 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
             path: "/",
          });
       }
+
+      await logActivity({
+        userId: user.id,
+        action: "LOGIN_PASSKEY",
+        description: "Login/verifikasi menggunakan passkey berhasil.",
+        route: "/login",
+        method: "SERVER_ACTION",
+      });
 
       return { 
         success: true, 
