@@ -189,10 +189,22 @@ export async function dismissMfaReminderAction() {
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    const dismissedAt = new Date();
+
     await prisma.user.update({
       where: { id: userId },
-      data: { mfaDismissedAt: new Date() },
+      data: { mfaDismissedAt: dismissedAt },
     });
+
+    await logActivity({
+      userId,
+      action: "MFA_REMINDER_DISMISSED",
+      description: "User menunda aktivasi MFA selama 24 jam dari halaman login.",
+      route: "/login",
+      method: "SERVER_ACTION",
+      metadata: { dismissedAt: dismissedAt.toISOString() },
+    });
+
     return { success: true };
   } catch (error) {
     return { success: false, error: "Failed to dismiss reminder" };

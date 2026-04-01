@@ -19,7 +19,7 @@ import {
 } from "@/app/actions/webauthn";
 import { verifyTOTPCode } from "@/app/actions/totp";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint, Smartphone, ChevronRight, X, ShieldAlert } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, ShieldCheck, Key, Lock, Eye, EyeOff, Fingerprint, Smartphone, ChevronRight, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfileStore } from "@/store/use-profile-store";
 
@@ -49,7 +49,6 @@ function LoginForm() {
   // MFA Enrollment Prompt
   const { setActiveTab } = useProfileStore();
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
-  const [dontRemindToday, setDontRemindToday] = useState(false);
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -286,22 +285,19 @@ function LoginForm() {
 
   const handleSkipMfa = async () => {
     setLoading(true);
-    try {
-      if (dontRemindToday) {
-        const dismissResult = await dismissMfaReminderAction();
-        if (!dismissResult.success) {
-          toast.error(dismissResult.error || "Failed to save reminder preference");
-        }
-      }
-      setShowMfaPrompt(false);
-      toast.success("Welcome back!");
-      router.push("/dashboard");
-      router.refresh();
-    } catch {
-      toast.error("Failed to process action");
-    } finally {
+    const dismissResult = await dismissMfaReminderAction();
+
+    if (!dismissResult.success) {
+      toast.error(dismissResult.error || "Failed to save reminder preference");
       setLoading(false);
+      return;
     }
+
+    setShowMfaPrompt(false);
+    toast.success("Welcome back!");
+    router.push("/dashboard");
+    router.refresh();
+    setLoading(false);
   };
 
   const handleActivateMfaNow = () => {
@@ -336,20 +332,6 @@ function LoginForm() {
                     Skip for Now
                  </Button>
               </div>
-
-              <label className="flex items-center justify-center gap-2 cursor-pointer group select-none">
-                 <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      checked={dontRemindToday} 
-                      onChange={(e) => setDontRemindToday(e.target.checked)} 
-                      className="peer sr-only" 
-                    />
-                    <div className="h-4 w-4 rounded border border-muted-foreground/30 peer-checked:bg-primary peer-checked:border-primary transition-all group-hover:border-primary/50"></div>
-                    <X className="absolute inset-0 h-4 w-4 text-white scale-0 peer-checked:scale-75 transition-transform" />
-                 </div>
-                 <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground group-hover:text-foreground">Don&apos;t remind me today</span>
-              </label>
            </div>
         </div>
       )}
