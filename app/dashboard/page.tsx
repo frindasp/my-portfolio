@@ -13,17 +13,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getCurrentUser } from "@/app/actions/auth";
+import { getCurrentUser, getTotalMessageCount } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [totalMessages, setTotalMessages] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
-      const u = await getCurrentUser();
+      const [u, totalMessagesRes] = await Promise.all([
+        getCurrentUser(),
+        getTotalMessageCount(),
+      ]);
       setUser(u);
+      if (totalMessagesRes.success) {
+        setTotalMessages(totalMessagesRes.totalMessages);
+      }
       setLoading(false);
     };
     loadData();
@@ -69,7 +76,7 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-12">
          {[
-           { label: "Total Messages", value: "1,284", icon: MessageSquare, color: "text-blue-500", bg: "bg-blue-500/10" },
+           { label: "Total Messages", value: totalMessages.toLocaleString("id-ID"), icon: MessageSquare, color: "text-blue-500", bg: "bg-blue-500/10" },
            { label: "New Leads", value: "+42", icon: Users, color: "text-green-500", bg: "bg-green-500/10" },
            { label: "Engagement", value: "84%", icon: TrendingUp, color: "text-purple-500", bg: "bg-purple-500/10" },
            { label: "Response Time", value: "< 2h", icon: Clock, color: "text-orange-500", bg: "bg-orange-500/10" },
