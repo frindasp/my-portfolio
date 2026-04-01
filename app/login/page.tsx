@@ -47,16 +47,9 @@ function LoginForm() {
   const [isAdminOtpRequested, setIsAdminOtpRequested] = useState(false);
 
   // MFA Enrollment Prompt
-  const { mfaDismissedToday, mfaDismissedDate, setMfaDismissedToday, setActiveTab } = useProfileStore();
+  const { setActiveTab } = useProfileStore();
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
   const [dontRemindToday, setDontRemindToday] = useState(false);
-
-  useEffect(() => {
-    // Check if store's dismissal was from a prior day
-    if (mfaDismissedDate && mfaDismissedDate !== new Date().toDateString()) {
-      setMfaDismissedToday(false);
-    }
-  }, [mfaDismissedDate, setMfaDismissedToday]);
 
   useEffect(() => {
     const emailParam = searchParams?.get("email");
@@ -85,7 +78,7 @@ function LoginForm() {
           if (res.userId) setTotp2faUserId(res.userId);
         } else {
           // No MFA required, check if we should show enrollment prompt
-           const shouldPrompt = (res.user as any).showMfaEnrollment && !mfaDismissedToday;
+           const shouldPrompt = (res.user as any).showMfaEnrollment;
            if (shouldPrompt) {
              setShowMfaPrompt(true);
            } else {
@@ -292,13 +285,23 @@ function LoginForm() {
   };
 
   const handleSkipMfa = async () => {
-    if (dontRemindToday) {
-      await dismissMfaReminderAction(); // Update DB
-      setMfaDismissedToday(true); // Update Local Store
+    setLoading(true);
+    try {
+      if (dontRemindToday) {
+        const dismissResult = await dismissMfaReminderAction();
+        if (!dismissResult.success) {
+          toast.error(dismissResult.error || "Failed to save reminder preference");
+        }
+      }
+      setShowMfaPrompt(false);
+      toast.success("Welcome back!");
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      toast.error("Failed to process action");
+    } finally {
+      setLoading(false);
     }
-    toast.success("Welcome back!");
-    router.push("/dashboard");
-    router.refresh();
   };
 
   const handleActivateMfaNow = () => {
@@ -329,7 +332,7 @@ function LoginForm() {
                  <Button onClick={handleActivateMfaNow} className="w-full h-12 rounded-2xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                     Enable 2FA Now
                  </Button>
-                 <Button variant="ghost" onClick={handleSkipMfa} className="w-full h-12 rounded-2xl font-bold text-muted-foreground hover:bg-muted">
+                 <Button variant="ghost" onClick={handleSkipMfa} disabled={loading} className="w-full h-12 rounded-2xl font-bold text-muted-foreground hover:bg-muted">
                     Skip for Now
                  </Button>
               </div>

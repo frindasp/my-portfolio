@@ -125,18 +125,15 @@ export async function loginWithPassword(email: string, password: string) {
 
     // Determine if we should show the MFA Enrollment popup
     let showMfaEnrollment = false;
+    const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
     if (!user.twoFactorEnabled) {
       if (!user.mfaDismissedAt) {
         showMfaEnrollment = true;
       } else {
-        const lastDismissed = new Date(user.mfaDismissedAt);
-        const today = new Date();
-        // If not same day (year/month/date), show again
-        if (
-          lastDismissed.getFullYear() !== today.getFullYear() ||
-          lastDismissed.getMonth() !== today.getMonth() ||
-          lastDismissed.getDate() !== today.getDate()
-        ) {
+        const lastDismissedTime = new Date(user.mfaDismissedAt).getTime();
+        const elapsed = Date.now() - lastDismissedTime;
+        // Show again after 24 hours if 2FA is still inactive
+        if (elapsed >= ONE_DAY_IN_MS) {
           showMfaEnrollment = true;
         }
       }
