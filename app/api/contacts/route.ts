@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/app/actions/auth";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,14 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    await logActivity({
+      userId: user.id,
+      action: "API_HIT",
+      description: "GET /api/contacts",
+      route: "/api/contacts",
+      method: "GET",
+    });
 
     const contacts = await prisma.contact.findMany({
       orderBy: { createdAt: "desc" },

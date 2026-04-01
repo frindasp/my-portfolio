@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getOrCreateRole } from "@/lib/roles";
 import { sendEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -141,6 +142,14 @@ export async function loginWithPassword(email: string, password: string) {
       }
     }
 
+    await logActivity({
+      userId: user.id,
+      action: "LOGIN",
+      description: "Login dari modul messaging berhasil.",
+      route: "/login",
+      method: "SERVER_ACTION",
+    });
+
     return {
       success: true,
       user: {
@@ -273,6 +282,14 @@ export async function verifyOTPAndLogin(
     path: "/",
   });
 
+  await logActivity({
+    userId: user.id,
+    action: "LOGIN_OTP",
+    description: "Login/registrasi OTP dari messaging berhasil.",
+    route: "/login",
+    method: "SERVER_ACTION",
+  });
+
   return {
     success: true,
     user: {
@@ -322,6 +339,22 @@ export async function resetPassword(
   });
 
   await prisma.verificationToken.delete({ where: { id: verification.id } });
+
+  const updatedUsers = await prisma.user.findMany({
+    where: { email, roleId: userRole.id },
+    select: { id: true },
+  });
+
+  for (const updatedUser of updatedUsers) {
+    await logActivity({
+      userId: updatedUser.id,
+      action: "PASSWORD_CHANGED",
+      description: "Password diubah dari modul messaging.",
+      route: "/login",
+      method: "SERVER_ACTION",
+    });
+  }
+
   return { success: true };
 }
 
@@ -668,10 +701,34 @@ export async function sendChatMessage(
     },
   });
 
+  await logActivity({
+    userId: resolvedSenderId,
+    action: "CHAT_MESSAGE_SENT",
+    description: normalizedContent,
+    route: "/dashboard/chat",
+    method: "SERVER_ACTION",
+    metadata: {
+      messageId: message.id,
+      isAdmin: false,
+    },
+  });
+
   return { success: true, message };
 }
 export async function logout() {
   const cookieStore = await cookies();
+  const userId = cookieStore.get("portfolio_session")?.value;
+
+  if (userId) {
+    await logActivity({
+      userId,
+      action: "LOGOUT",
+      description: "Logout dari modul messaging.",
+      route: "/dashboard",
+      method: "SERVER_ACTION",
+    });
+  }
+
   cookieStore.delete("portfolio_session");
   return { success: true };
 }

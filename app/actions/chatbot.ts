@@ -2,6 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { getCurrentUser } from "./auth";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -16,33 +17,40 @@ export async function sendChatbotReply(contactId: string, content: string) {
   }
 
   try {
-    // 1. Get the current logged-in user automatically
     const currentUser = await getCurrentUser();
-    
+
     if (!currentUser) {
       return { success: false, error: "Unauthorized. Please login first." };
     }
 
-    // 2. Create the message linked to the contact and the sender
     const newMessage = await prisma.message.create({
       data: {
         content,
         contactId,
         senderId: currentUser.id,
-        isAdmin: true, // Typically admin replies via chatbot/dashboard
+        isAdmin: true,
       },
       include: {
         Contact: true,
         User: {
-          select: { name: true, email: true }
-        }
-      }
+          select: { name: true, email: true },
+        },
+      },
     });
 
-    return { 
-      success: true, 
+    await logActivity({
+      userId: currentUser.id,
+      action: "CHAT_MESSAGE_SENT",
+      description: content,
+      route: "/dashboard/chat",
+      method: "SERVER_ACTION",
+      metadata: { messageId: newMessage.id, isAdmin: true },
+    });
+
+    return {
+      success: true,
       message: newMessage,
-      info: `Reply sent by ${currentUser.name || currentUser.email}`
+      info: `Reply sent by ${currentUser.name || currentUser.email}`,
     };
   } catch (error) {
     console.error("Chatbot Action Error:", error);

@@ -5,6 +5,7 @@ import { contactSchema } from "@/lib/schema";
 import { APP_CONFIG } from "@/lib/constants";
 import { sendEmail } from "@/lib/email";
 import { redirect } from "next/navigation";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -27,7 +28,7 @@ export async function submitContact(formData: FormData) {
     });
 
     // ALSO: Save as a message record for live chat/history
-    await (prisma.message.create as any)({
+    const createdMessage = await (prisma.message.create as any)({
       data: {
         content: validatedData.message,
         senderEmail: validatedData.email,
@@ -36,6 +37,17 @@ export async function submitContact(formData: FormData) {
         isAdmin: false,
       },
     });
+
+    if (userId) {
+      await logActivity({
+        userId,
+        action: "CHAT_MESSAGE_SENT",
+        description: validatedData.message,
+        route: "/contact",
+        method: "SERVER_ACTION",
+        metadata: { messageId: createdMessage.id },
+      });
+    }
 
     // If they already exist as a user, we can still redirect or just return success
     if (existingUser) {

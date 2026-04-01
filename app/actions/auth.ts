@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/lib/email";
 import * as bcrypt from "bcryptjs";
+import { logActivity } from "@/lib/activity-log";
 
 const prisma = new PrismaClient();
 
@@ -35,6 +36,14 @@ export async function loginWithPassword(email: string, password: string) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60, // 1 week
       path: "/",
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: "LOGIN",
+      description: "Login dengan email dan password berhasil.",
+      route: "/login",
+      method: "SERVER_ACTION",
     });
 
     return { 
@@ -138,6 +147,14 @@ export async function verifyOTP(email: string, token: string) {
       path: "/",
     });
 
+    await logActivity({
+      userId: user!.id,
+      action: "LOGIN_OTP",
+      description: "Login/verifikasi OTP berhasil.",
+      route: "/login",
+      method: "SERVER_ACTION",
+    });
+
     return { 
       success: true, 
       user: { id: user!.id, email: user!.email, name: user!.name, role: user!.Role.name } 
@@ -226,6 +243,21 @@ export async function resetPassword(email: string, token: string, newPw: string)
 
     await prisma.verificationToken.delete({ where: { id: vt.id } });
 
+    const updatedUsers = await prisma.user.findMany({
+      where: { email, roleId: userRole.id },
+      select: { id: true },
+    });
+
+    for (const updatedUser of updatedUsers) {
+      await logActivity({
+        userId: updatedUser.id,
+        action: "PASSWORD_CHANGED",
+        description: "Password diubah melalui OTP reset password.",
+        route: "/login",
+        method: "SERVER_ACTION",
+      });
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Reset Password Error:", error);
@@ -235,6 +267,18 @@ export async function resetPassword(email: string, token: string, newPw: string)
 
 export async function logout() {
   const cookieStore = await cookies();
+  const userId = cookieStore.get("portfolio_session")?.value;
+
+  if (userId) {
+    await logActivity({
+      userId,
+      action: "LOGOUT",
+      description: "Logout dari dashboard.",
+      route: "/dashboard",
+      method: "SERVER_ACTION",
+    });
+  }
+
   cookieStore.delete("portfolio_session");
   return { success: true };
 }
@@ -282,10 +326,20 @@ export async function updateCurrentUserFullName(fullName: string) {
   }
 
   try {
+    const existingUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { name: trimmedName },
       select: { id: true, name: true, email: true },
+    });
+
+    await logActivity({
+      userId,
+      action: "PROFILE_NAME_CHANGED",
+      description: `Nama diubah dari "${existingUser?.name || "-"}" menjadi "${updatedUser.name || "-"}".`,
+      route: "/dashboard/profile",
+      method: "SERVER_ACTION",
     });
 
     return { success: true, user: updatedUser };

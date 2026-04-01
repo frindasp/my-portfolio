@@ -34,19 +34,20 @@ model Role {
 }
 
 model User {
-  id               String              @id @default(cuid())
-  name             String?
-  email            String
-  password         String
-  roleId           String
-  twoFactorEnabled Boolean             @default(false)
-  mfaDismissedAt   DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  Messages         Message[]
-  Role             Role                @relation(fields: [roleId], references: [id])
-  authenticators   Authenticator[]
-  totp             TotpAuthenticator[]
+  id                    String                @id @default(cuid())
+  name                  String?
+  email                 String
+  password              String
+  roleId                String
+  twoFactorEnabled      Boolean               @default(false)
+  mfaDismissedAt        DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  Messages              Message[]
+  HistoryActivityUser   HistoryActivityUser[]
+  Role                  Role                  @relation(fields: [roleId], references: [id])
+  authenticators        Authenticator[]
+  totp                  TotpAuthenticator[]
 
   @@unique([email, roleId])
   @@index([roleId], map: "User_roleId_fkey")
@@ -105,4 +106,25 @@ model VerificationToken {
   createdAt DateTime @default(now())
 
   @@unique([email, token])
+}
+
+
+model HistoryActivityUser {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  description String?  @db.Text
+  route       String?
+  method      String?
+  ipAddress   String?
+  deviceType  String?
+  userAgent   String?
+  location    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  User        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
 }
