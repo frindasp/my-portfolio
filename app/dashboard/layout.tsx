@@ -72,9 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-muted/30">
+    <div className="relative left-1/2 flex h-[calc(100dvh-73px)] min-h-0 w-screen -translate-x-1/2 overflow-hidden bg-muted/30">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex h-screen w-72 flex-col overflow-hidden border-r bg-card shadow-sm">
+      <aside className="hidden md:flex h-full min-h-0 w-72 flex-col overflow-hidden border-r bg-card shadow-sm">
         <div className="p-8">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform">
@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
-        <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-4">
+        <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-4 pb-4">
           {sidebarItems
             .filter(item => !item.adminOnly || (currentUser?.Role as any)?.name === "Admin")
             .map((item) => {
@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="p-4 mt-auto border-t">
+        <div className="mt-auto shrink-0 border-t p-4">
           <div className="bg-muted/50 rounded-2xl p-4 mb-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
               {currentUser?.name?.charAt(0).toUpperCase()}
@@ -177,7 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Main Content Area */}
-      <main className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Header Bar (Mobile only) */}
         <header className="md:hidden flex items-center justify-between px-4 h-16 bg-card/80 backdrop-blur-md border-b sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
