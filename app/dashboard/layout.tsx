@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (checkingAuth) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
+      <div className="flex min-h-[70vh] w-full max-w-full items-center justify-center overflow-x-hidden bg-background">
         <div className="flex flex-col items-center gap-4">
           <Zap className="h-10 w-10 animate-pulse text-primary" />
           <p className="text-sm font-medium animate-pulse text-muted-foreground tracking-widest uppercase">Initializing Dashboard...</p>
