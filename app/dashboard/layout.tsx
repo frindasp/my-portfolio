@@ -72,9 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-muted/30">
+    <div className="flex h-screen overflow-hidden bg-muted/30">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-72 flex-col bg-card border-r shadow-sm">
+      <aside className="hidden md:flex h-screen w-72 flex-col overflow-hidden border-r bg-card shadow-sm">
         <div className="p-8">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform">
@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1 mt-4">
+        <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-4">
           {sidebarItems
             .filter(item => !item.adminOnly || (currentUser?.Role as any)?.name === "Admin")
             .map((item) => {
@@ -177,7 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <main className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Header Bar (Mobile only) */}
         <header className="md:hidden flex items-center justify-between px-4 h-16 bg-card/80 backdrop-blur-md border-b sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
