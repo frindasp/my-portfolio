@@ -44,6 +44,7 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
   const [totpName, setTotpName] = useState("");
   const [totpVerifying, setTotpVerifying] = useState(false);
   const [secretCopied, setSecretCopied] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     loadPasskeys();
@@ -58,6 +59,14 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadPasskeys = async () => {
@@ -181,6 +190,11 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
 
   const mfaDismissedDate = initialUser?.mfaDismissedAt ? new Date(initialUser.mfaDismissedAt) : null;
   const isDismissedToday = mfaDismissedDate && mfaDismissedDate.toDateString() === new Date().toDateString();
+  const reminderAvailableAt = mfaDismissedDate ? new Date(mfaDismissedDate.getTime() + 24 * 60 * 60 * 1000) : null;
+  const remainingMs = reminderAvailableAt ? Math.max(reminderAvailableAt.getTime() - currentTime.getTime(), 0) : 0;
+  const hoursLeft = Math.floor(remainingMs / (1000 * 60 * 60));
+  const minutesLeft = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const secondsLeft = Math.floor((remainingMs % (1000 * 60)) / 1000);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -263,23 +277,25 @@ export function SecuritySettings({ user: initialUser }: { user: any }) {
           </div>
 
           {/* MFA Reminder Preference status */}
-          <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-             <div className="space-y-1">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-amber-700">MFA Reminder Status</h4>
-                <p className="text-[10px] text-amber-800/60 font-medium">
-                   {isDismissedToday 
-                     ? "You've opted to skip MFA prompts for today." 
-                     : initialUser?.mfaDismissedAt 
-                        ? `Last skipped on ${mfaDismissedDate?.toLocaleDateString()}`
-                        : "You'll be prompted to fix security if 2FA is inactive."}
+          {!twoFactorEnabled && (
+            <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-700">MFA Reminder Status</h4>
+                <p className="text-[10px] text-emerald-800/70 font-medium">
+                  {isDismissedToday
+                    ? `You've opted to skip MFA prompts for today. Next reminder in ${hoursLeft}h ${minutesLeft}m ${secondsLeft}s.`
+                    : initialUser?.mfaDismissedAt
+                      ? `Last skipped on ${mfaDismissedDate?.toLocaleDateString()} at ${mfaDismissedDate?.toLocaleTimeString()}.`
+                      : "You'll be prompted to fix security if 2FA is inactive."}
                 </p>
-             </div>
-             {isDismissedToday && (
-                <div className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-700 text-[9px] font-black uppercase tracking-tighter self-start sm:self-auto">
-                   Skipped Today
+              </div>
+              {isDismissedToday && (
+                <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-700 text-[9px] font-black uppercase tracking-tighter self-start sm:self-auto">
+                  Skipped Today
                 </div>
-             )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* TOTP Setup Inline */}
           {totpSetupMode && (
