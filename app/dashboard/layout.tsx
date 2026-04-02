@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="relative left-1/2 flex h-[calc(100dvh-73px)] min-h-0 w-screen -translate-x-1/2 overflow-hidden bg-muted/30">
+    <div className="relative flex h-[calc(100dvh-73px)] min-h-0 w-full min-w-0 overflow-hidden rounded-2xl border bg-muted/30">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex h-full min-h-0 w-72 flex-col overflow-hidden border-r bg-card shadow-sm">
         <div className="p-8">
@@ -199,7 +199,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <section className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 lg:p-12 scroll-smooth">
+        <section className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 lg:p-10 scroll-smooth">
           <div className="max-w-6xl mx-auto h-full space-y-8 sm:space-y-12">
             {children}
           </div>
