@@ -25,6 +25,7 @@ import {
   Check, 
   CheckCheck, 
   ChevronRight,
+  ChevronLeft,
   RefreshCw,
   Search,
   MoreVertical
@@ -271,9 +272,12 @@ export default function ChatPage() {
   const activeConv = conversations.find(c => c.id === activeConvId);
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="flex gap-6 h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-4 duration-700 relative overflow-hidden">
       {/* Sidebar: Conversation List */}
-      <div className="w-96 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10">
+      <div className={cn(
+        "w-full md:w-96 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10 transition-all duration-300",
+        activeConvId ? "hidden md:flex" : "flex"
+      )}>
         <div className="p-6 border-b bg-muted/20 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
@@ -354,14 +358,25 @@ export default function ChatPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10">
+      <div className={cn(
+        "flex-1 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10 transition-all duration-300",
+        !activeConvId ? "hidden md:flex" : "flex"
+      )}>
         {activeConvId ? (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b bg-muted/20 backdrop-blur-md">
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                  <Hash className="h-7 w-7" />
+            <div className="flex items-center justify-between p-4 md:p-6 border-b bg-muted/20 backdrop-blur-md">
+              <div className="flex items-center gap-2 md:gap-4">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="md:hidden rounded-2xl" 
+                  onClick={() => setActiveConvId(null)}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <div className="h-10 w-10 md:h-14 md:w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                  <Hash className="h-5 w-5 md:h-7 md:h-7" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
