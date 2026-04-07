@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Send, Loader2, User, LogIn, Link2, ChevronLeft, Plus, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMessagingStore } from "@/store/use-messaging-store";
+import { useMessagingStore, ConversationWithLastMessage } from "@/store/use-messaging-store";
 import {
   getConversations,
   getMessages,
@@ -14,6 +14,7 @@ import {
   getMessageOwnershipDiff,
   getUnreadConversationCounts,
   markConversationAsRead,
+  updateConversationAlias,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import AuthOverlay from "./AuthOverlay";
@@ -27,6 +28,9 @@ export default function ChatWindow() {
     activeConvId, setActiveConv,
     userId, userEmail, isRegistered, userName 
   } = useMessagingStore();
+  const [userNickname, setUserNickname] = useState("");
+  const [adminNickname, setAdminNickname] = useState("");
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
 
   const [content, setContent] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -52,7 +56,7 @@ export default function ChatWindow() {
     if (userEmail) {
       Promise.all([getConversations(), getUnreadConversationCounts()]).then(
         ([loadedConversations, unreadMap]) => {
-          setConversations(loadedConversations as any);
+          setConversations(loadedConversations as ConversationWithLastMessage[]);
           setUnreadCounts(unreadMap || {});
         },
       );
@@ -95,21 +99,20 @@ export default function ChatWindow() {
     channel.bind("conversation-updated", (data: any) => {
       if (!data?.conversationId || !data?.lastMessage) return;
 
-      setConversations((prev) => {
-        const idx = prev.findIndex((conversation: any) => conversation.id === data.conversationId);
-        if (idx === -1) return prev;
-
-        const updated = [...prev];
+      const idx = conversations.findIndex((conversation) => conversation.id === data.conversationId);
+      if (idx !== -1) {
+        const updated = [...conversations];
         updated[idx] = {
           ...updated[idx],
           updatedAt: data.lastMessage.createdAt || new Date().toISOString(),
           Message: [data.lastMessage],
         };
-        return updated.sort(
+        const sorted = updated.sort(
           (a: any, b: any) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
         );
-      });
+        setConversations(sorted);
+      }
 
       const isAdminReply = !!data.lastMessage.isAdmin;
       if (isAdminReply && activeConvId !== data.conversationId) {
@@ -183,7 +186,8 @@ export default function ChatWindow() {
     try {
       const res = await createConversation(newTitle);
       if (res.success && res.conversation) {
-        setConversations([res.conversation, ...conversations] as any);
+        // Need to add Message array to match ConversationWithLastMessage type
+        setConversations([{ ...res.conversation, Message: [] }, ...conversations]);
         setActiveConv(res.conversation.id);
         setNewTitle("");
       } else {
@@ -205,7 +209,7 @@ export default function ChatWindow() {
       if (result.success) {
         setOwnershipDiffCount(0);
         const refreshed = await getConversations();
-        setConversations(refreshed as any);
+        setConversations(refreshed as ConversationWithLastMessage[]);
         toast.success(`${result.updatedCount} chat lama berhasil dipadankan`);
       } else {
         toast.error(result.error || "Gagal memadankan chat lama");
@@ -214,6 +218,23 @@ export default function ChatWindow() {
       toast.error("Gagal memadankan chat lama");
     } finally {
       setSyncingOwnership(false);
+    }
+  };
+
+  const handleUpdateAlias = async () => {
+    if (!activeConvId) return;
+    try {
+      const res = await updateConversationAlias(activeConvId, userNickname, adminNickname);
+      if (res.success) {
+        toast.success("Nicknames updated");
+        setIsEditingAlias(false);
+        // Update local state for conversations
+        setConversations(conversations.map((c) => 
+          c.id === activeConvId ? { ...c, userAlias: userNickname, adminAlias: adminNickname } : c
+        ));
+      }
+    } catch (err) {
+      toast.error("Failed to update nicknames");
     }
   };
 
@@ -314,7 +335,18 @@ export default function ChatWindow() {
              <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h3 className="text-sm font-semibold truncate max-w-[150px]">{activeConv?.title || "Support"}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold truncate max-w-[120px]">
+                {activeConv?.title || "Support"}
+              </h3>
+              <button onClick={() => {
+                setUserNickname(activeConv?.userAlias || "");
+                setAdminNickname(activeConv?.adminAlias || "");
+                setIsEditingAlias(!isEditingAlias);
+              }} className="opacity-40 hover:opacity-100 transition-opacity">
+                <User className="h-3 w-3" />
+              </button>
+            </div>
             <div className="flex items-center gap-1 mt-0.5">
                <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Real-time</p>
@@ -327,6 +359,37 @@ export default function ChatWindow() {
           </Button>
         )}
       </div>
+
+      {/* Alias Editor Overlay */}
+      {isEditingAlias && (
+        <div className="p-4 bg-muted/30 border-b animate-in slide-in-from-top duration-300">
+           <p className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-60">Conversation Nicknames</p>
+           <div className="space-y-2">
+             <div className="flex flex-col gap-1">
+               <label className="text-[9px] font-medium ml-1">Your Alias (User)</label>
+               <Input 
+                 placeholder="Set your nickname..." 
+                 value={userNickname} 
+                 onChange={(e) => setUserNickname(e.target.value)}
+                 className="h-8 text-[11px] rounded-lg"
+               />
+             </div>
+             <div className="flex flex-col gap-1">
+               <label className="text-[9px] font-medium ml-1">Admin's Alias</label>
+               <Input 
+                 placeholder="Set admin's nickname..." 
+                 value={adminNickname} 
+                 onChange={(e) => setAdminNickname(e.target.value)}
+                 className="h-8 text-[11px] rounded-lg"
+               />
+             </div>
+             <div className="flex gap-2 pt-1">
+               <Button size="sm" className="h-7 text-[10px] flex-1 rounded-lg" onClick={handleUpdateAlias}>Save</Button>
+               <Button size="sm" variant="ghost" className="h-7 text-[10px] rounded-lg" onClick={() => setIsEditingAlias(false)}>Cancel</Button>
+             </div>
+           </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div 

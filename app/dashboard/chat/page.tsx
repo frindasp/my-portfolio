@@ -9,6 +9,9 @@ import {
   createConversation,
   syncMessageOwnership,
   getMessageOwnershipDiff,
+  getUnreadConversationCounts,
+  markConversationAsRead,
+  updateConversationAlias,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import { 
@@ -45,6 +48,10 @@ export default function ChatPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [userNickname, setUserNickname] = useState("");
+  const [adminNickname, setAdminNickname] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load Initial Data (User & Conversations)
@@ -56,6 +63,10 @@ export default function ChatPage() {
         const convs = await getConversations();
         setConversations(convs);
         
+        // Initial Unread Counts
+        const unreadMap = await getUnreadConversationCounts(currentUser.email, currentUser.id);
+        setUnreadCounts(unreadMap || {});
+
         // Check for pending syncs
         const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
         setPendingSyncCount(diff.pendingCount || 0);
@@ -75,24 +86,31 @@ export default function ChatPage() {
     
     channel.bind("conversation-updated", (data: any) => {
       setConversations((prev) => {
-        const index = prev.findIndex((c) => c.id === data.conversationId);
-        if (index === -1) {
-          // If not found, a new conversation might have been created
-          // We could re-fetch or take the data if provided fully
+        const idx = prev.findIndex((c) => c.id === data.conversationId);
+        let updated;
+        if (idx === -1) {
+          // If we want to handle completely new conversations from Admin side:
           return prev; 
+        } else {
+          updated = [...prev];
+          updated[idx] = { 
+            ...updated[idx], 
+            updatedAt: data.lastMessage.createdAt || new Date().toISOString(),
+            Message: [data.lastMessage]
+          };
         }
-        const updated = [...prev];
-        updated[index] = { 
-          ...updated[index], 
-          updatedAt: new Date().toISOString(),
-          Message: [data.lastMessage]
-        };
-        // Sort by updatedAt
         return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       });
       
-      if (data.lastMessage.senderId !== user?.id) {
-         toast.info(`New message in: ${data.conversationId}`);
+      const isExternalSender = data.lastMessage.senderId !== user?.id;
+      if (isExternalSender) {
+         if (activeConvId !== data.conversationId) {
+           setUnreadCounts(prev => ({
+             ...prev,
+             [data.conversationId]: (prev[data.conversationId] || 0) + 1
+           }));
+         }
+         toast.info(`New message in thread`);
       }
     });
 
@@ -137,10 +155,19 @@ export default function ChatPage() {
       });
     });
 
+    // Mark as read when opening
+    markConversationAsRead(activeConvId).then(() => {
+       setUnreadCounts(prev => {
+         const next = {...prev};
+         delete next[activeConvId];
+         return next;
+       });
+    });
+
     return () => {
       pusherClient.unsubscribe(channelName);
     };
-  }, [activeConvId]);
+  }, [activeConvId, setConversations]);
 
   // Auto Scroll
   useEffect(() => {
@@ -207,6 +234,18 @@ export default function ChatPage() {
       toast.error("Sync failed");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleUpdateAlias = async () => {
+    if (!activeConvId) return;
+    const res = await updateConversationAlias(activeConvId, userNickname, adminNickname);
+    if (res.success) {
+      toast.success("Nicknames updated");
+      setIsEditingAlias(false);
+      setConversations(conversations.map(c => c.id === activeConvId ? { ...c, userAlias: userNickname, adminAlias: adminNickname } : c));
+    } else {
+      toast.error(res.error || "Update failed");
     }
   };
 
@@ -280,13 +319,22 @@ export default function ChatPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-bold truncate tracking-tight">{conv.title || "General Chat"}</p>
-                    <span className="text-[10px] opacity-40 font-medium shrink-0">
-                      {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: false })}
-                    </span>
+                    <p className="text-sm font-bold truncate tracking-tight">
+                      {conv.title || "General Chat"}
+                    </p>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                       {unreadCounts[conv.id] > 0 && (
+                         <span className="h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-primary text-[8px] font-black text-primary-foreground animate-pulse">
+                           {unreadCounts[conv.id]}
+                         </span>
+                       )}
+                       <span className="text-[10px] opacity-40 font-medium whitespace-nowrap">
+                         {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: false })}
+                       </span>
+                    </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground truncate opacity-70 mt-0.5">
-                    {conv.Message?.[0]?.content || "No messages yet"}
+                     {conv.userAlias ? `[${conv.userAlias}] ` : ""}{conv.Message?.[0]?.content || "No messages yet"}
                   </p>
                 </div>
               </button>
@@ -306,7 +354,16 @@ export default function ChatPage() {
                   <Hash className="h-7 w-7" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight">{activeConv?.title || "Conversation"}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold tracking-tight">{activeConv?.title || "Conversation"}</h2>
+                    <button onClick={() => {
+                      setUserNickname(activeConv?.userAlias || "");
+                      setAdminNickname(activeConv?.adminAlias || "");
+                      setIsEditingAlias(!isEditingAlias);
+                    }} className="opacity-30 hover:opacity-100">
+                      <User className="h-4 w-4" />
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="flex items-center gap-1.5 text-[10px] text-green-500 font-bold uppercase tracking-widest bg-green-500/10 px-2 py-0.5 rounded-full">
                        <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -316,6 +373,27 @@ export default function ChatPage() {
                   </div>
                 </div>
               </div>
+              
+              {isEditingAlias && (
+                <div className="absolute right-20 top-6 z-50 bg-background border rounded-2xl shadow-2xl p-4 w-64 animate-in zoom-in-95">
+                   <p className="text-[10px] font-bold uppercase tracking-widest mb-3 opacity-60">Nicknames</p>
+                   <div className="space-y-3">
+                      <div>
+                        <label className="text-[9px] font-bold ml-1 mb-1">Your Nickname</label>
+                        <Input value={userNickname} onChange={e => setUserNickname(e.target.value)} className="h-9 text-xs rounded-xl" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold ml-1 mb-1">Admin Nickname</label>
+                        <Input value={adminNickname} onChange={e => setAdminNickname(e.target.value)} className="h-9 text-xs rounded-xl" />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" className="h-8 flex-1 rounded-xl text-xs" onClick={handleUpdateAlias}>Save</Button>
+                        <Button size="sm" variant="ghost" className="h-8 rounded-xl text-xs" onClick={() => setIsEditingAlias(false)}>Cancel</Button>
+                      </div>
+                   </div>
+                </div>
+              )}
+
               <Button variant="ghost" size="icon" className="rounded-2xl opacity-40 hover:opacity-100">
                  <MoreVertical className="h-5 w-5" />
               </Button>
@@ -353,12 +431,17 @@ export default function ChatPage() {
                         "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold shadow-sm",
                         showAvatar ? (isMe ? "bg-primary text-primary-foreground" : "bg-muted border shadow-sm") : "opacity-0"
                       )}>
-                        {isMe ? "ME" : (msg.User?.name?.charAt(0) || "?")}
+                        {isMe ? "ME" : (activeConv?.adminAlias?.charAt(0) || msg.User?.name?.charAt(0) || "?")}
                       </div>
                       <div className={cn(
                         "flex flex-col max-w-[70%]",
                         isMe ? "items-end" : "items-start"
                       )}>
+                        {!isMe && (
+                          <span className="text-[10px] font-bold mb-1 opacity-60">
+                             {msg.sender?.name || (msg.isAdmin ? `Admin - ${activeConv?.adminAlias || msg.User?.name || "Support"}` : (activeConv?.userAlias || msg.User?.name || "User"))}
+                          </span>
+                        )}
                         <div className={cn(
                           "px-6 py-4 rounded-3xl text-sm leading-relaxed shadow-sm",
                           isMe 

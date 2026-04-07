@@ -665,49 +665,70 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
 
   if (!resolvedEmail && !resolvedUserId) return {};
 
-  const unreadMessages = await prisma.message.findMany({
+  // For each conversation, find the lastReadAt from ConversationReadState
+  // or default to a very old date.
+  const allConversations = await prisma.conversation.findMany({
     where: {
-      isAdmin: true,
-      isRead: false,
-      conversationId: { not: null },
-      Conversation: {
-        OR: [
-          { email: resolvedEmail || undefined },
-          {
-            Message: {
-              some: {
-                senderId: resolvedUserId || undefined,
-              },
-            },
-          },
-        ],
-      },
+      OR: [
+        { email: resolvedEmail || undefined },
+        { Message: { some: { senderEmail: resolvedEmail || undefined } } }
+      ]
     },
     select: {
-      conversationId: true,
-    },
+      id: true,
+    }
   });
 
-  return unreadMessages.reduce<Record<string, number>>((acc, item) => {
-    const convId = item.conversationId;
-    if (!convId) return acc;
-    acc[convId] = (acc[convId] || 0) + 1;
+  const convIds = allConversations.map(c => c.id);
+  
+  const readStates = await prisma.conversationReadState.findMany({
+    where: {
+      conversationId: { in: convIds },
+      userId: resolvedUserId || "GUEST", // Use email if no ID? Actually ID is better.
+    }
+  });
+
+  const readStateMap = readStates.reduce<Record<string, Date>>((acc, s) => {
+    acc[s.conversationId] = s.lastReadAt;
     return acc;
   }, {});
+
+  const unreadMap: Record<string, number> = {};
+
+  for (const convId of convIds) {
+    const lastRead = readStateMap[convId] || new Date(0);
+    const count = await prisma.message.count({
+      where: {
+        conversationId: convId,
+        isAdmin: true, // User only cares about messages from Admin
+        createdAt: { gt: lastRead }
+      }
+    });
+    if (count > 0) unreadMap[convId] = count;
+  }
+
+  return unreadMap;
 }
 
-export async function markConversationAsRead(conversationId: string) {
+export async function markConversationAsRead(conversationId: string, userId?: string) {
   if (!conversationId) return { success: false, error: "Conversation ID is required" };
+  
+  const currentUser = await getCurrentUser();
+  const resolvedUserId = currentUser?.id || userId || "GUEST";
 
-  await prisma.message.updateMany({
+  await prisma.conversationReadState.upsert({
     where: {
+      conversationId_userId: {
+        conversationId,
+        userId: resolvedUserId,
+      }
+    },
+    update: { lastReadAt: new Date() },
+    create: {
       conversationId,
-      isAdmin: true,
-      isRead: false,
-    },
-    data: {
-      isRead: true,
-    },
+      userId: resolvedUserId,
+      lastReadAt: new Date(),
+    }
   });
 
   return { success: true };
@@ -739,6 +760,22 @@ export async function createConversation(title: string, email?: string) {
   } catch (error) {
     console.error("Create Conversation Error:", error);
     return { success: false, error: "Failed to create conversation" };
+  }
+}
+
+export async function updateConversationAlias(conversationId: string, userAlias?: string, adminAlias?: string) {
+  try {
+    const updated = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { 
+        userAlias: userAlias !== undefined ? userAlias : undefined,
+        adminAlias: adminAlias !== undefined ? adminAlias : undefined,
+      },
+    });
+    return { success: true, conversation: updated };
+  } catch (err) {
+    console.error("Update Alias Error:", err);
+    return { success: false, error: "Failed to update alias" };
   }
 }
 
@@ -870,12 +907,32 @@ export async function sendChatMessage(
   // Trigger Pusher for Real-time
   try {
     const channel = activeConversationId ? `conversation-${activeConversationId}` : `user-${resolvedEmail?.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    await pusherServer.trigger(channel, "new-message", message);
+    
+    // Prepare sender info for the frontend
+    const isSenderAdmin = currentUser?.Role?.name === "Admin";
+    let senderName = message.User?.name || message.senderEmail || "Guest";
+    
+    if (message.Conversation) {
+      if (isSenderAdmin) {
+        senderName = message.Conversation.adminAlias || message.User?.name || "Admin";
+        senderName = `Admin - ${senderName}`;
+      } else {
+        senderName = message.Conversation.userAlias || message.User?.name || "User";
+      }
+    }
+
+    const pusherMessage = {
+      ...message,
+      sender: { name: senderName },
+      senderRole: isSenderAdmin ? "admin" : "user"
+    };
+
+    await pusherServer.trigger(channel, "new-message", pusherMessage);
     
     // Also notify some "global" channel for admin if they are on the conversation list
     await pusherServer.trigger("admin-notifications", "conversation-updated", {
       conversationId: activeConversationId,
-      lastMessage: message
+      lastMessage: pusherMessage
     });
   } catch (pusherError) {
     console.error("Pusher Trigger Error:", pusherError);

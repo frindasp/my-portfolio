@@ -1,10 +1,14 @@
 import { create } from "zustand";
 import { Message, Conversation } from "@prisma/client";
 
+export type ConversationWithLastMessage = Conversation & {
+  Message: Message[];
+};
+
 interface MessagingState {
   isOpen: boolean;
   messages: Message[];
-  conversations: Conversation[];
+  conversations: ConversationWithLastMessage[];
   activeConvId: string | null;
   userEmail: string | null;
   userId: string | null;
@@ -14,7 +18,7 @@ interface MessagingState {
   toggleOpen: () => void;
   setUser: (user: { id: string; name: string | null; email: string }) => void;
   setMessages: (messages: Message[]) => void;
-  setConversations: (conversations: Conversation[]) => void;
+  setConversations: (conversations: ConversationWithLastMessage[]) => void;
   setActiveConv: (convId: string | null) => void;
   addMessage: (message: Message) => void;
   setEmail: (email: string) => void;
