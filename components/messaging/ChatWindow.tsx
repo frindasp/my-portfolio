@@ -12,6 +12,8 @@ import {
   createConversation,
   syncMessageOwnership,
   getMessageOwnershipDiff,
+  getUnreadConversationCounts,
+  markConversationAsRead,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import AuthOverlay from "./AuthOverlay";
@@ -34,13 +36,26 @@ export default function ChatWindow() {
   const [syncingOwnership, setSyncingOwnership] = useState(false);
   const [ownershipDiffCount, setOwnershipDiffCount] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const baseTitleRef = useRef<string>("Coretan");
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load Initial Conversations & Ownership Diff
   useEffect(() => {
+    if (typeof document !== "undefined") {
+      baseTitleRef.current = document.title;
+    }
+  }, []);
+
+  useEffect(() => {
     if (userEmail) {
-      getConversations().then(setConversations as any);
+      Promise.all([getConversations(), getUnreadConversationCounts()]).then(
+        ([loadedConversations, unreadMap]) => {
+          setConversations(loadedConversations as any);
+          setUnreadCounts(unreadMap || {});
+        },
+      );
       
       if (userId) {
         getMessageOwnershipDiff(userEmail, userId).then((result) => {
@@ -50,7 +65,66 @@ export default function ChatWindow() {
     }
   }, [userEmail, userId, setConversations]);
 
+  useEffect(() => {
+    const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+    if (typeof document === "undefined") return;
+
+    document.title =
+      totalUnread > 0
+        ? `(${totalUnread}) - ${baseTitleRef.current}`
+        : baseTitleRef.current;
+  }, [unreadCounts]);
+
+  useEffect(() => {
+    if (!activeConvId) return;
+
+    markConversationAsRead(activeConvId).then(() => {
+      setUnreadCounts((prev) => {
+        if (!prev[activeConvId]) return prev;
+        const next = { ...prev };
+        delete next[activeConvId];
+        return next;
+      });
+    });
+  }, [activeConvId]);
+
   // Load Messages for Active Conversation & Subscribe Pusher
+  useEffect(() => {
+    const channel = pusherClient.subscribe("admin-notifications");
+
+    channel.bind("conversation-updated", (data: any) => {
+      if (!data?.conversationId || !data?.lastMessage) return;
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((conversation: any) => conversation.id === data.conversationId);
+        if (idx === -1) return prev;
+
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          updatedAt: data.lastMessage.createdAt || new Date().toISOString(),
+          Message: [data.lastMessage],
+        };
+        return updated.sort(
+          (a: any, b: any) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        );
+      });
+
+      const isAdminReply = !!data.lastMessage.isAdmin;
+      if (isAdminReply && activeConvId !== data.conversationId) {
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [data.conversationId]: (prev[data.conversationId] || 0) + 1,
+        }));
+      }
+    });
+
+    return () => {
+      pusherClient.unsubscribe("admin-notifications");
+    };
+  }, [activeConvId, setConversations]);
+
   useEffect(() => {
     if (!activeConvId) return;
 
@@ -206,7 +280,14 @@ export default function ChatWindow() {
                >
                  <div className="flex justify-between items-start gap-2">
                     <p className="text-xs font-bold truncate tracking-tight">{c.title || "Support Thread"}</p>
-                    <span className="text-[9px] opacity-40 shrink-0">#{c.id.slice(-4)}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {unreadCounts[c.id] ? (
+                        <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
+                          {unreadCounts[c.id]}
+                        </span>
+                      ) : null}
+                      <span className="text-[9px] opacity-40">#{c.id.slice(-4)}</span>
+                    </div>
                  </div>
                  {c.Message?.[0] && (
                    <p className="text-[10px] text-muted-foreground truncate opacity-70 mt-0.5 line-clamp-1 italic">
