@@ -15,6 +15,7 @@ interface MessagingState {
   userName: string | null;
   isRegistered: boolean;
   hasCheckedEmail: boolean;
+  unreadCount: number;
   toggleOpen: () => void;
   setUser: (user: { id: string; name: string | null; email: string }) => void;
   setMessages: (messages: Message[]) => void;
@@ -22,6 +23,7 @@ interface MessagingState {
   setActiveConv: (convId: string | null) => void;
   addMessage: (message: Message) => void;
   setEmail: (email: string) => void;
+  setUnreadCount: (count: number) => void;
   clearSession: () => void;
 }
 
@@ -35,6 +37,7 @@ export const useMessagingStore = create<MessagingState>((set) => ({
   userName: null,
   isRegistered: false,
   hasCheckedEmail: false,
+  unreadCount: 0,
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
   setUser: (user) => set({ 
     userId: user.id, 
@@ -52,6 +55,7 @@ export const useMessagingStore = create<MessagingState>((set) => ({
     return { messages: [...state.messages, message] };
   }),
   setEmail: (email) => set({ userEmail: email, hasCheckedEmail: true }),
+  setUnreadCount: (unreadCount) => set({ unreadCount }),
   clearSession: () => set({ 
     userEmail: null, 
     userId: null, 
@@ -60,6 +64,7 @@ export const useMessagingStore = create<MessagingState>((set) => ({
     hasCheckedEmail: false,
     conversations: [],
     activeConvId: null,
-    messages: []
+    messages: [],
+    unreadCount: 0
   }),
 }));

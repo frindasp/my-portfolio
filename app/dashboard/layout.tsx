@@ -20,11 +20,12 @@ import { logout, getCurrentUser, getUnreadConversationCounts } from "@/app/actio
 import { pusherClient } from "@/lib/pusher";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useMessagingStore } from "@/store/use-messaging-store";
 
 const sidebarItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Verification Codes", href: "/dashboard/otp", icon: ShieldCheck, adminOnly: true },
-  { name: "Live Chat (Socket.io)", href: "/dashboard/chat", icon: MessageSquare },
+  { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
   { name: "Profile", href: "/dashboard/profile", icon: User },
   { name: "History", href: "/dashboard/history", icon: History },
 ];
@@ -35,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount, setUnreadCount } = useMessagingStore();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -131,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <item.icon className={cn("h-5 w-5", isActive ? "" : "group-hover:scale-110 transition-transform")} />
                 <span className="flex-1">{item.name}</span>
-                {item.name === "Live Chat (Socket.io)" && unreadCount > 0 && (
+                {item.name === "Chat" && unreadCount > 0 && (
                   <span className="h-5 w-5 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white shadow-lg animate-pulse border-2 border-white/20">
                     {unreadCount}
                   </span>
@@ -197,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <item.icon className="h-5 w-5" />
               <span className="flex-1">{item.name}</span>
-              {item.name === "Live Chat (Socket.io)" && unreadCount > 0 && (
+              {item.name === "Chat" && unreadCount > 0 && (
                 <span className="h-6 w-6 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white shadow-lg">
                   {unreadCount}
                 </span>
@@ -228,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-2">
             <Link href="/dashboard/chat" className="hidden sm:block">
               <Button size="sm" className="h-9 px-4 rounded-xl text-xs font-bold shadow-lg shadow-primary/20">
-                Live Chat
+                Chat
               </Button>
             </Link>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl hover:bg-muted">

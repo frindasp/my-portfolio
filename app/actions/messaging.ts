@@ -688,23 +688,29 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
     }
   });
 
-  const readStateMap = readStates.reduce<Record<string, Date>>((acc, s) => {
-    acc[s.conversationId] = s.lastReadAt;
+  const readStateMap = readStates.reduce<Record<string, { lastReadAt: Date, isRead: boolean }>>((acc, s) => {
+    acc[s.conversationId] = { lastReadAt: s.lastReadAt, isRead: s.isRead };
     return acc;
   }, {});
 
   const unreadMap: Record<string, number> = {};
 
   for (const convId of convIds) {
-    const lastRead = readStateMap[convId] || new Date(0);
+    const state = readStateMap[convId] || { lastReadAt: new Date(0), isRead: true };
     const count = await prisma.message.count({
       where: {
         conversationId: convId,
         isAdmin: true, // User only cares about messages from Admin
-        createdAt: { gt: lastRead }
+        createdAt: { gt: state.lastReadAt }
       }
     });
-    if (count > 0) unreadMap[convId] = count;
+
+    if (count > 0) {
+      unreadMap[convId] = count;
+    } else if (!state.isRead) {
+      // Manual Unread: No new messages but user marked as unread
+      unreadMap[convId] = -1; // -1 signifies "dot only"
+    }
   }
 
   return unreadMap;
@@ -723,11 +729,40 @@ export async function markConversationAsRead(conversationId: string, userId?: st
         userId: resolvedUserId,
       }
     },
-    update: { lastReadAt: new Date() },
+    update: { 
+      lastReadAt: new Date(),
+      isRead: true, // Reset manual unread status
+    },
     create: {
       conversationId,
       userId: resolvedUserId,
       lastReadAt: new Date(),
+      isRead: true,
+    }
+  });
+
+  return { success: true };
+}
+
+export async function toggleConversationReadStatus(conversationId: string, isRead: boolean, userId?: string) {
+  if (!conversationId) return { success: false };
+  
+  const currentUser = await getCurrentUser();
+  const resolvedUserId = currentUser?.id || userId || "GUEST";
+
+  await prisma.conversationReadState.upsert({
+    where: {
+      conversationId_userId: {
+        conversationId,
+        userId: resolvedUserId,
+      }
+    },
+    update: { isRead },
+    create: {
+      conversationId,
+      userId: resolvedUserId,
+      isRead,
+      lastReadAt: new Date(0), // If marking as unread, maybe they want to see old messages too?
     }
   });
 

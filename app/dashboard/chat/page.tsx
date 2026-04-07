@@ -12,6 +12,7 @@ import {
   getUnreadConversationCounts,
   markConversationAsRead,
   updateConversationAlias,
+  toggleConversationReadStatus,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import { 
@@ -35,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useMessagingStore } from "@/store/use-messaging-store";
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -54,6 +56,7 @@ export default function ChatPage() {
   const [userNickname, setUserNickname] = useState("");
   const [adminNickname, setAdminNickname] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { setUnreadCount: setGlobalUnreadCount } = useMessagingStore();
 
   // Load Initial Data (User & Conversations)
   useEffect(() => {
@@ -67,6 +70,7 @@ export default function ChatPage() {
         // Initial Unread Counts
         const unreadMap = await getUnreadConversationCounts(currentUser.email, currentUser.id);
         setUnreadCounts(unreadMap || {});
+        setGlobalUnreadCount(Object.keys(unreadMap || {}).length);
 
         // Check for pending syncs
         const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
@@ -106,10 +110,14 @@ export default function ChatPage() {
       const isExternalSender = data.lastMessage.senderId !== user?.id;
       if (isExternalSender) {
          if (activeConvId !== data.conversationId) {
-           setUnreadCounts(prev => ({
-             ...prev,
-             [data.conversationId]: (prev[data.conversationId] || 0) + 1
-           }));
+            setUnreadCounts(prev => {
+              const next = {
+                ...prev,
+                [data.conversationId]: (prev[data.conversationId] || 0) + 1
+              };
+              setGlobalUnreadCount(Object.keys(next).length);
+              return next;
+            });
          }
          toast.info(`New message in thread`);
       }
@@ -161,6 +169,7 @@ export default function ChatPage() {
        setUnreadCounts(prev => {
          const next = {...prev};
          delete next[activeConvId];
+         setGlobalUnreadCount(Object.keys(next).length);
          return next;
        });
     });
@@ -327,9 +336,12 @@ export default function ChatPage() {
                       {conv.title || "General Chat"}
                     </p>
                     <div className="flex items-center gap-1.5 shrink-0">
-                       {unreadCounts[conv.id] > 0 && (
-                         <span className="h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-primary text-[8px] font-black text-primary-foreground animate-pulse">
-                           {unreadCounts[conv.id]}
+                       {unreadCounts[conv.id] !== undefined && (
+                         <span className={cn(
+                           "flex items-center justify-center rounded-full bg-primary text-primary-foreground animate-pulse",
+                           unreadCounts[conv.id] === -1 ? "h-2 w-2" : "h-4 min-w-4 px-1 text-[8px] font-black"
+                         )}>
+                           {unreadCounts[conv.id] !== -1 && unreadCounts[conv.id]}
                          </span>
                        )}
                        <span className="text-[10px] opacity-40 font-medium whitespace-nowrap">
@@ -409,6 +421,24 @@ export default function ChatPage() {
                 </div>
               )}
 
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-2xl opacity-40 hover:opacity-100"
+                onClick={async () => {
+                  if (!activeConvId) return;
+                  await toggleConversationReadStatus(activeConvId, false);
+                  // Refresh unread counts
+                  const map = await getUnreadConversationCounts();
+                  setUnreadCounts(map || {});
+                  setGlobalUnreadCount(Object.keys(map || {}).length);
+                  // Exit detail view on mobile
+                  if (window.innerWidth < 768) setActiveConvId(null);
+                  toast.info("Marked as unread");
+                }}
+              >
+                 <Clock className="h-5 w-5" />
+              </Button>
               <Button variant="ghost" size="icon" className="rounded-2xl opacity-40 hover:opacity-100">
                  <MoreVertical className="h-5 w-5" />
               </Button>

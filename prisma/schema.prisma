@@ -149,6 +149,7 @@ model ConversationReadState {
   conversationId String
   userId         String
   lastReadAt     DateTime @default(now())
+  isRead         Boolean  @default(true)
 
   @@unique([conversationId, userId])
 }
