@@ -16,7 +16,8 @@ import {
   History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { logout, getCurrentUser } from "@/app/actions/messaging";
+import { logout, getCurrentUser, getUnreadConversationCounts } from "@/app/actions/messaging";
+import { pusherClient } from "@/lib/pusher";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -46,9 +48,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       setCurrentUser(user);
       setCheckingAuth(false);
+
+      // Initial unread count
+      const countMap = await getUnreadConversationCounts(user.email, user.id);
+      setUnreadCount(Object.keys(countMap).length);
     };
     checkAuth();
   }, [router, pathname]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // Subscribe to admin notifications to catch new messages while on other pages
+    const channel = pusherClient.subscribe("admin-notifications");
+    channel.bind("conversation-updated", (data: any) => {
+       // Re-fetch count for accuracy
+       getUnreadConversationCounts(currentUser.email, currentUser.id).then(map => {
+         setUnreadCount(Object.keys(map).length);
+       });
+    });
+
+    return () => { pusherClient.unsubscribe("admin-notifications"); }
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -101,8 +122,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               >
                 <item.icon className={cn("h-5 w-5", isActive ? "" : "group-hover:scale-110 transition-transform")} />
-                {item.name}
-                {isActive && <ChevronRight className="ml-auto h-4 w-4 opacity-50" />}
+                <span className="flex-1">{item.name}</span>
+                {item.name === "Live Chat (Socket.io)" && unreadCount > 0 && (
+                  <span className="h-5 w-5 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white shadow-lg animate-pulse border-2 border-white/20">
+                    {unreadCount}
+                  </span>
+                )}
+                {isActive && <ChevronRight className="ml-2 h-4 w-4 opacity-50" />}
               </Link>
             );
           })}
@@ -162,7 +188,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.name === "Live Chat (Socket.io)" && unreadCount > 0 && (
+                <span className="h-6 w-6 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white shadow-lg">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           ))}
           <Button 

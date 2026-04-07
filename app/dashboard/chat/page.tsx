@@ -119,6 +119,16 @@ export default function ChatPage() {
     };
   }, [user]);
 
+  // Browser Title Notification
+  useEffect(() => {
+    const unreadConvosTotal = Object.keys(unreadCounts).length;
+    if (unreadConvosTotal > 0) {
+      document.title = `(${unreadConvosTotal}) Chat - Portfolio OS`;
+    } else {
+      document.title = `Chat - Portfolio OS`;
+    }
+  }, [unreadCounts]);
+
   // Load Messages for Active Conversation & Subscribe to it
   useEffect(() => {
     if (!activeConvId) return;
