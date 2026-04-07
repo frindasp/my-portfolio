@@ -814,7 +814,7 @@ export async function sendChatMessage(
 
   // Trigger Pusher for Real-time
   try {
-    const channel = activeConversationId ? `chat-${activeConversationId}` : `user-${resolvedEmail?.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const channel = activeConversationId ? `conversation-${activeConversationId}` : `user-${resolvedEmail?.replace(/[^a-zA-Z0-9]/g, '_')}`;
     await pusherServer.trigger(channel, "new-message", message);
     
     // Also notify some "global" channel for admin if they are on the conversation list

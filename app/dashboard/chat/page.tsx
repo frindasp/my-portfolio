@@ -115,7 +115,7 @@ export default function ChatPage() {
     loadMessages();
 
     // Subscribe to specific chat channel
-    const channelName = `chat-${activeConvId}`;
+    const channelName = `conversation-${activeConvId}`;
     const channel = pusherClient.subscribe(channelName);
 
     channel.bind("new-message", (data: any) => {

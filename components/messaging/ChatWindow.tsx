@@ -64,7 +64,7 @@ export default function ChatWindow() {
     loadMessages();
 
     // Pusher Subscription
-    const channelName = `chat-${activeConvId}`;
+    const channelName = `conversation-${activeConvId}`;
     const channel = pusherClient.subscribe(channelName);
     
     channel.bind("new-message", (data: any) => {
