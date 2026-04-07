@@ -1,9 +1,11 @@
 import { create } from "zustand";
-import { Message } from "@prisma/client";
+import { Message, Conversation } from "@prisma/client";
 
 interface MessagingState {
   isOpen: boolean;
   messages: Message[];
+  conversations: Conversation[];
+  activeConvId: string | null;
   userEmail: string | null;
   userId: string | null;
   userName: string | null;
@@ -12,6 +14,8 @@ interface MessagingState {
   toggleOpen: () => void;
   setUser: (user: { id: string; name: string | null; email: string }) => void;
   setMessages: (messages: Message[]) => void;
+  setConversations: (conversations: Conversation[]) => void;
+  setActiveConv: (convId: string | null) => void;
   addMessage: (message: Message) => void;
   setEmail: (email: string) => void;
   clearSession: () => void;
@@ -20,6 +24,8 @@ interface MessagingState {
 export const useMessagingStore = create<MessagingState>((set) => ({
   isOpen: false,
   messages: [],
+  conversations: [],
+  activeConvId: null,
   userEmail: null,
   userId: null,
   userName: null,
@@ -34,13 +40,22 @@ export const useMessagingStore = create<MessagingState>((set) => ({
     hasCheckedEmail: true
   }),
   setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  setConversations: (conversations) => set({ conversations }),
+  setActiveConv: (activeConvId) => set({ activeConvId }),
+  addMessage: (message) => set((state) => {
+    // Prevent duplicates
+    if (state.messages.some(m => m.id === message.id)) return state;
+    return { messages: [...state.messages, message] };
+  }),
   setEmail: (email) => set({ userEmail: email, hasCheckedEmail: true }),
   clearSession: () => set({ 
     userEmail: null, 
     userId: null, 
     userName: null, 
     isRegistered: false, 
-    hasCheckedEmail: false 
+    hasCheckedEmail: false,
+    conversations: [],
+    activeConvId: null,
+    messages: []
   }),
 }));

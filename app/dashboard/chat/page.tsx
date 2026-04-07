@@ -3,97 +3,144 @@
 import { useState, useEffect, useRef } from "react";
 import {
   getCurrentUser,
-  getMessageOwnershipDiff,
+  getConversations,
   getMessages,
   sendChatMessage,
+  createConversation,
   syncMessageOwnership,
+  getMessageOwnershipDiff,
 } from "@/app/actions/messaging";
-import { io, Socket } from "socket.io-client";
-import { Send, Loader2, User, MessageCircle, Wifi, WifiOff, RefreshCw, Check, CheckCheck } from "lucide-react";
+import { pusherClient } from "@/lib/pusher";
+import { 
+  Send, 
+  Loader2, 
+  User, 
+  MessageCircle, 
+  Plus, 
+  Hash, 
+  Clock, 
+  Check, 
+  CheckCheck, 
+  ChevronRight,
+  RefreshCw,
+  Search,
+  MoreVertical
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
 export default function ChatPage() {
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [content, setContent] = useState("");
+  const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Socket.io
+  // Load Initial Data (User & Conversations)
   useEffect(() => {
-    const initSocket = async () => {
-      // First, ensure the server is initialized by hitting our API route
-      await fetch("/api/socket");
-      
-      const newSocket = io({
-        path: "/api/socket",
-        addTrailingSlash: false,
-      });
+    const init = async () => {
+      const currentUser = await getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        const convs = await getConversations();
+        setConversations(convs);
+        
+        // Check for pending syncs
+        const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
+        setPendingSyncCount(diff.pendingCount || 0);
 
-      newSocket.on("connect", () => {
-        setConnected(true);
-        console.log(">>> [Socket.io] Connected context:", newSocket.id);
-      });
-
-      newSocket.on("disconnect", () => {
-        setConnected(false);
-        console.log(">>> [Socket.io] Disconnected context");
-      });
-
-      setSocket(newSocket);
-
-      return () => {
-        newSocket.disconnect();
-      };
+        if (convs.length > 0) {
+          setActiveConvId(convs[0].id);
+        }
+      }
+      setLoading(false);
     };
-
-    initSocket();
+    init();
   }, []);
 
-  // Sync Room & Receive Messages
+  // Subscribe to Global Notifications (for new conversations or updates)
   useEffect(() => {
-    if (!socket || !user) return;
+    const channel = pusherClient.subscribe("admin-notifications");
+    
+    channel.bind("conversation-updated", (data: any) => {
+      setConversations((prev) => {
+        const index = prev.findIndex((c) => c.id === data.conversationId);
+        if (index === -1) {
+          // If not found, a new conversation might have been created
+          // We could re-fetch or take the data if provided fully
+          return prev; 
+        }
+        const updated = [...prev];
+        updated[index] = { 
+          ...updated[index], 
+          updatedAt: new Date().toISOString(),
+          Message: [data.lastMessage]
+        };
+        // Sort by updatedAt
+        return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      });
+      
+      if (data.lastMessage.senderId !== user?.id) {
+         toast.info(`New message in: ${data.conversationId}`);
+      }
+    });
 
-    socket.emit("join-chat", user.id);
+    return () => {
+      pusherClient.unsubscribe("admin-notifications");
+    };
+  }, [user]);
 
-    socket.on("receive-message", (data: any) => {
+  // Load Messages for Active Conversation & Subscribe to it
+  useEffect(() => {
+    if (!activeConvId) return;
+
+    const loadMessages = async () => {
+      setLoadingMessages(true);
+      const history = await getMessages(undefined, undefined, activeConvId);
+      setMessages(history);
+      setLoadingMessages(false);
+    };
+
+    loadMessages();
+
+    // Subscribe to specific chat channel
+    const channelName = `chat-${activeConvId}`;
+    const channel = pusherClient.subscribe(channelName);
+
+    channel.bind("new-message", (data: any) => {
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === data.id);
         if (exists) return prev;
         return [...prev, data];
       });
+      
+      // Also update conversations list updatedAt
+      setConversations((prev) => {
+        const index = prev.findIndex((c) => c.id === activeConvId);
+        if (index !== -1) {
+          const updated = [...prev];
+          updated[index] = { ...updated[index], updatedAt: data.createdAt, Message: [data] };
+          return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        }
+        return prev;
+      });
     });
 
     return () => {
-      socket.off("receive-message");
+      pusherClient.unsubscribe(channelName);
     };
-  }, [socket, user]);
-
-  // Load User & History
-  useEffect(() => {
-    const loadData = async () => {
-      const currentUser = await getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-        // FETCH BY BOTH EMAIL AND ID TO GET ALL HISTORY (AUTO-MERGE)
-        const history = await getMessages(currentUser.email, currentUser.id);
-        setMessages(history);
-
-        const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
-        setPendingSyncCount(diff.pendingCount || 0);
-      }
-      setLoading(false);
-    };
-    loadData();
-  }, []);
+  }, [activeConvId]);
 
   // Auto Scroll
   useEffect(() => {
@@ -104,62 +151,60 @@ export default function ChatPage() {
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!content.trim() || sending || !user) return;
+    if (!content.trim() || sending || !activeConvId || !user) return;
 
     setSending(true);
     try {
-      // 1. Save to DB via Server Action
-      // PASS CONTENT, EMAIL, AND ID FOR TRACKING
-      const res = await sendChatMessage(content, user.email, user.id);
+      const res = await sendChatMessage(content, user.email, user.id, activeConvId);
       if (res.success && res.message) {
-        // 2. Add locally
+        // Message will be added via Pusher bind or locally for immediate feedback
         setMessages((prev) => [...prev, res.message]);
-        
-        // 3. Emit to others via Socket.io when available
-        if (socket && connected) {
-          socket.emit("client-message", {
-            ...res.message,
-            room: `chat-${user.id}`
-          });
-        }
-        
         setContent("");
       } else {
-        toast.error((res as any).error || "Failed to send");
+        toast.error("Failed to send message");
       }
     } catch (err) {
-      toast.error("Something went wrong");
+      toast.error("An error occurred");
     } finally {
       setSending(false);
     }
   };
 
-  const handleSyncMessageOwnership = async () => {
-    if (!user || syncing) return;
+  const handleCreateConv = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || isCreating) return;
 
+    setIsCreating(true);
+    try {
+      const res = await createConversation(newTitle);
+      if (res.success && res.conversation) {
+        setConversations((prev) => [res.conversation, ...prev]);
+        setActiveConvId(res.conversation.id);
+        setNewTitle("");
+        toast.success("New conversation started!");
+      } else {
+        toast.error("Failed to create conversation");
+      }
+    } catch (err) {
+      toast.error("An error occurred");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!user || syncing) return;
     setSyncing(true);
     try {
       const res = await syncMessageOwnership(user.email, user.id);
-      if (!res.success) {
-        toast.error((res as any).error || "Gagal memadankan chat.");
-        return;
+      if (res.success) {
+        const convs = await getConversations();
+        setConversations(convs);
+        setPendingSyncCount(0);
+        toast.success(`${res.updatedCount} messages synchronized!`);
       }
-
-      const [history, diff] = await Promise.all([
-        getMessages(user.email, user.id),
-        getMessageOwnershipDiff(user.email, user.id),
-      ]);
-
-      setMessages(history);
-      setPendingSyncCount(diff.pendingCount || 0);
-
-      toast.success(
-        res.updatedCount > 0
-          ? `${res.updatedCount} message berhasil dipadankan ke akun kamu.`
-          : "Tidak ada message yang perlu dipadankan.",
-      );
-    } catch (error) {
-      toast.error("Terjadi kesalahan saat sinkronisasi chat.");
+    } catch (err) {
+      toast.error("Sync failed");
     } finally {
       setSyncing(false);
     }
@@ -169,123 +214,207 @@ export default function ChatPage() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium tracking-tight">Syncing conversation...</p>
+        <p className="text-sm font-medium tracking-tight">Initializing real-time chat...</p>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-160px)] bg-card border rounded-3xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b bg-muted/20 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-            <MessageCircle className="h-6 w-6" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold">WebSocket Chat</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {connected ? (
-                <span className="flex items-center gap-1 text-[10px] text-green-500 font-bold uppercase tracking-wider">
-                  <Wifi className="h-3 w-3" /> Live
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[10px] text-amber-500 font-bold uppercase tracking-wider">
-                  <WifiOff className="h-3 w-3" /> Offline mode
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleSyncMessageOwnership}
-          disabled={!user || syncing || pendingSyncCount === 0}
-          className="rounded-xl"
-        >
-          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Padankan Chat{pendingSyncCount > 0 ? ` (${pendingSyncCount})` : ""}
-        </Button>
-      </div>
+  const activeConv = conversations.find(c => c.id === activeConvId);
 
-      {/* Message List */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-6 bg-muted/5"
-      >
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-30">
-            <div className="p-4 bg-muted rounded-full">
-              <User className="h-12 w-12 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">No messages yet</p>
-              <p className="text-xs">Start chatting via WebSocket!</p>
-            </div>
+  return (
+    <div className="flex gap-6 h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Sidebar: Conversation List */}
+      <div className="w-96 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10">
+        <div className="p-6 border-b bg-muted/20 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              Chat Threads
+            </h2>
+            <Button size="icon" variant="ghost" className="rounded-full" onClick={handleSync} disabled={pendingSyncCount === 0 || syncing}>
+               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className={cn("h-4 w-4", pendingSyncCount > 0 && "text-primary animate-pulse")} />}
+            </Button>
           </div>
-        ) : (
-          messages.map((msg) => {
-            const isMe = msg.senderId === user.id;
-            return (
-              <div 
-                key={msg.id}
+          
+          <form onSubmit={handleCreateConv} className="relative group">
+            <Input 
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="New thread title..."
+              className="rounded-2xl pl-10 pr-10 h-11 bg-background/50 border-primary/10 focus:border-primary/30 transition-all shadow-inner"
+            />
+            <Plus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <button 
+              type="submit" 
+              disabled={!newTitle.trim() || isCreating}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:scale-110 active:scale-95 transition-all disabled:opacity-30"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </form>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {conversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center opacity-30 grayscale">
+               <Hash className="h-12 w-12 mb-2" />
+               <p className="text-sm font-medium">No conversations yet</p>
+               <p className="text-[10px]">Start your first thread above!</p>
+            </div>
+          ) : (
+            conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => setActiveConvId(conv.id)}
                 className={cn(
-                  "flex flex-col max-w-[80%] md:max-w-[70%] animate-in fade-in duration-300",
-                  isMe ? "self-end ml-auto" : "self-start mr-auto"
+                  "w-full text-left p-5 transition-all border-b border-primary/5 flex gap-4 group relative",
+                  activeConvId === conv.id ? "bg-primary/10" : "hover:bg-muted/50"
                 )}
               >
-                <div 
-                  className={cn(
-                    "px-5 py-3 rounded-3xl text-sm shadow-sm",
-                    isMe 
-                      ? "bg-primary text-primary-foreground rounded-br-none" 
-                      : "bg-background border rounded-bl-none"
-                  )}
-                >
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {activeConvId === conv.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />}
+                <div className={cn(
+                   "h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-sm",
+                   activeConvId === conv.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  {conv.title?.charAt(0) || "G"}
                 </div>
-                <span
-                  className={cn(
-                    "mt-2 text-[10px] font-medium opacity-50 flex items-center gap-1",
-                    isMe ? "self-end" : "self-start"
-                  )}
-                >
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {isMe && (
-                    connected ? (
-                      <CheckCheck className="h-3 w-3 text-sky-500" />
-                    ) : (
-                      <Check className="h-3 w-3" />
-                    )
-                  )}
-                </span>
-              </div>
-            );
-          })
-        )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold truncate tracking-tight">{conv.title || "General Chat"}</p>
+                    <span className="text-[10px] opacity-40 font-medium shrink-0">
+                      {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: false })}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate opacity-70 mt-0.5">
+                    {conv.Message?.[0]?.content || "No messages yet"}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Input */}
-      <div className="p-6 border-t bg-muted/20">
-        <form onSubmit={handleSend} className="relative flex items-center gap-3">
-          <Input 
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 rounded-2xl h-14 pl-6 pr-14 bg-background border-muted shadow-sm focus:ring-primary/20"
-            disabled={sending}
-          />
-          <Button 
-            type="submit"
-            size="icon"
-            disabled={sending || !content.trim()}
-            className="absolute right-2 h-10 w-10 rounded-xl transition-all active:scale-95 shadow-lg"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10">
+        {activeConvId ? (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b bg-muted/20 backdrop-blur-md">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                  <Hash className="h-7 w-7" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">{activeConv?.title || "Conversation"}</h2>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="flex items-center gap-1.5 text-[10px] text-green-500 font-bold uppercase tracking-widest bg-green-500/10 px-2 py-0.5 rounded-full">
+                       <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                       Real-time
+                    </span>
+                    <span className="text-[10px] opacity-40 font-medium">#{activeConvId.slice(-8)}</span>
+                  </div>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="rounded-2xl opacity-40 hover:opacity-100">
+                 <MoreVertical className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Message List */}
+            <div 
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto p-8 space-y-8 bg-muted/5 custom-scrollbar"
+            >
+              {loadingMessages ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 opacity-30">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <p className="text-xs font-mono">Retrieving stream...</p>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-20">
+                  <MessageCircle className="h-16 w-16" />
+                  <p className="text-sm font-semibold tracking-widest uppercase">Start of history</p>
+                </div>
+              ) : (
+                messages.map((msg, idx) => {
+                  const isMe = msg.senderId === user.id || (msg.isAdmin && user.Role?.name === "Admin");
+                  const showAvatar = idx === 0 || messages[idx-1].senderId !== msg.senderId;
+                  
+                  return (
+                    <div 
+                      key={msg.id}
+                      className={cn(
+                        "flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500",
+                        isMe ? "flex-row-reverse" : "flex-row"
+                      )}
+                    >
+                      <div className={cn(
+                        "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold shadow-sm",
+                        showAvatar ? (isMe ? "bg-primary text-primary-foreground" : "bg-muted border shadow-sm") : "opacity-0"
+                      )}>
+                        {isMe ? "ME" : (msg.User?.name?.charAt(0) || "?")}
+                      </div>
+                      <div className={cn(
+                        "flex flex-col max-w-[70%]",
+                        isMe ? "items-end" : "items-start"
+                      )}>
+                        <div className={cn(
+                          "px-6 py-4 rounded-3xl text-sm leading-relaxed shadow-sm",
+                          isMe 
+                            ? "bg-primary text-primary-foreground rounded-tr-none" 
+                            : "bg-background border rounded-tl-none"
+                        )}>
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                        <span className="mt-2 text-[10px] font-bold opacity-30 flex items-center gap-1.5 tracking-tighter">
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {isMe && <CheckCheck className="h-3 w-3 text-primary" />}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-8 border-t bg-muted/20 backdrop-blur-xl">
+              <form onSubmit={handleSend} className="relative flex items-center gap-4">
+                <Input 
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Collaborate in real-time..."
+                  className="flex-1 rounded-2xl h-16 pl-8 pr-16 bg-background/80 border-primary/20 shadow-2xl focus:ring-primary/10 text-base"
+                  disabled={sending}
+                />
+                <Button 
+                  type="submit"
+                  disabled={sending || !content.trim()}
+                  className="absolute right-3 h-12 w-12 rounded-xl transition-all active:scale-95 shadow-xl bg-primary hover:bg-primary/90"
+                  size="icon"
+                >
+                  {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                </Button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 p-12 text-center">
+            <div className="h-24 w-24 rounded-[40px] bg-primary/10 flex items-center justify-center text-primary animate-bounce duration-[2000ms]">
+               <MessageCircle className="h-12 w-12" />
+            </div>
+            <div className="space-y-2 max-w-sm">
+               <h3 className="text-2xl font-bold tracking-tight">Select a conversation</h3>
+               <p className="text-muted-foreground text-sm leading-relaxed">
+                  Choose a thread from the sidebar or start a new one to begin real-time collaboration.
+               </p>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary/40">
+               <Clock className="h-3 w-3" /> Waiting for interaction
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
