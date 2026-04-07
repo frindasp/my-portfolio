@@ -95,7 +95,7 @@ export default function ChatPage() {
           updated = [...prev];
           updated[idx] = { 
             ...updated[idx], 
-            updatedAt: data.lastMessage.createdAt || new Date().toISOString(),
+            updatedAt: data.lastMessage.createdAt ? new Date(data.lastMessage.createdAt) : new Date(),
             Message: [data.lastMessage]
           };
         }
@@ -148,7 +148,7 @@ export default function ChatPage() {
         const index = prev.findIndex((c) => c.id === activeConvId);
         if (index !== -1) {
           const updated = [...prev];
-          updated[index] = { ...updated[index], updatedAt: data.createdAt, Message: [data] };
+          updated[index] = { ...updated[index], updatedAt: new Date(data.createdAt), Message: [data] };
           return updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         }
         return prev;

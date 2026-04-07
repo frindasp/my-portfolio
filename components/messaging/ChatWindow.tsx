@@ -96,7 +96,7 @@ export default function ChatWindow() {
   useEffect(() => {
     const channel = pusherClient.subscribe("admin-notifications");
 
-    channel.bind("conversation-updated", (data: any) => {
+    channel.bind("conversation-updated", (data: { conversationId: string; lastMessage: any }) => {
       if (!data?.conversationId || !data?.lastMessage) return;
 
       const idx = conversations.findIndex((conversation) => conversation.id === data.conversationId);
@@ -104,11 +104,11 @@ export default function ChatWindow() {
         const updated = [...conversations];
         updated[idx] = {
           ...updated[idx],
-          updatedAt: data.lastMessage.createdAt || new Date().toISOString(),
+          updatedAt: data.lastMessage.createdAt ? new Date(data.lastMessage.createdAt) : new Date(),
           Message: [data.lastMessage],
         };
         const sorted = updated.sort(
-          (a: any, b: any) =>
+          (a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
         );
         setConversations(sorted);
