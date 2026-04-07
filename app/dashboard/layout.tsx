@@ -51,7 +51,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       // Initial unread count
       const countMap = await getUnreadConversationCounts(user.email, user.id);
-      setUnreadCount(Object.keys(countMap).length);
+      const totalMessages = (Object.values(countMap || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+      setUnreadCount(totalMessages);
     };
     checkAuth();
   }, [router, pathname]);
@@ -64,7 +65,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     channel.bind("conversation-updated", (data: any) => {
        // Re-fetch count for accuracy
        getUnreadConversationCounts(currentUser.email, currentUser.id).then(map => {
-         setUnreadCount(Object.keys(map).length);
+         const total = (Object.values(map || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+         setUnreadCount(total);
        });
     });
 
@@ -133,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <item.icon className={cn("h-5 w-5", isActive ? "" : "group-hover:scale-110 transition-transform")} />
                 <span className="flex-1">{item.name}</span>
                 {item.name === "Chat" && unreadCount > 0 && (
-                  <span className="h-5 w-5 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white shadow-lg animate-pulse border-2 border-white/20">
+                  <span className="h-5 min-w-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white shadow-lg animate-pulse border-2 border-white/20">
                     {unreadCount}
                   </span>
                 )}

@@ -70,7 +70,8 @@ export default function ChatPage() {
         // Initial Unread Counts
         const unreadMap = await getUnreadConversationCounts(currentUser.email, currentUser.id);
         setUnreadCounts(unreadMap || {});
-        setGlobalUnreadCount(Object.keys(unreadMap || {}).length);
+        const total = (Object.values(unreadMap || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+        setGlobalUnreadCount(total);
 
         // Check for pending syncs
         const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
@@ -115,7 +116,8 @@ export default function ChatPage() {
                 ...prev,
                 [data.conversationId]: (prev[data.conversationId] || 0) + 1
               };
-              setGlobalUnreadCount(Object.keys(next).length);
+              const total = (Object.values(next) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+              setGlobalUnreadCount(total);
               return next;
             });
          }
@@ -169,7 +171,8 @@ export default function ChatPage() {
        setUnreadCounts(prev => {
          const next = {...prev};
          delete next[activeConvId];
-         setGlobalUnreadCount(Object.keys(next).length);
+         const total = (Object.values(next) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+         setGlobalUnreadCount(total);
          return next;
        });
     });
@@ -431,7 +434,8 @@ export default function ChatPage() {
                   // Refresh unread counts
                   const map = await getUnreadConversationCounts();
                   setUnreadCounts(map || {});
-                  setGlobalUnreadCount(Object.keys(map || {}).length);
+                  const total = (Object.values(map || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
+                  setGlobalUnreadCount(total);
                   // Exit detail view on mobile
                   if (window.innerWidth < 768) setActiveConvId(null);
                   toast.info("Marked as unread");
