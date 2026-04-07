@@ -25,7 +25,6 @@ const sidebarItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Verification Codes", href: "/dashboard/otp", icon: ShieldCheck, adminOnly: true },
   { name: "Live Chat (Socket.io)", href: "/dashboard/chat", icon: MessageSquare },
-  { name: "Pusher Events", href: "/dashboard/pusher-chat", icon: Zap },
   { name: "Profile", href: "/dashboard/profile", icon: User },
   { name: "History", href: "/dashboard/history", icon: History },
 ];
@@ -70,6 +69,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return () => { pusherClient.unsubscribe("admin-notifications"); }
   }, [currentUser]);
+
+  // Global Browser Tab Notification
+  useEffect(() => {
+    if (unreadCount > 0) {
+      document.title = `(${unreadCount}) Portfolio OS`;
+    } else {
+      document.title = `Portfolio OS`;
+    }
+  }, [unreadCount]);
 
   const handleLogout = async () => {
     try {
@@ -230,8 +238,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <section className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 lg:p-10 scroll-smooth">
-          <div className="max-w-6xl mx-auto h-full space-y-8 sm:space-y-12">
+        <section className="min-h-0 flex-1 p-4 sm:p-6 md:p-8 lg:p-10">
+          <div className="max-w-6xl mx-auto h-full">
             {children}
           </div>
         </section>

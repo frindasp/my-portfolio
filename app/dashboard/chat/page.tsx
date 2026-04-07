@@ -120,16 +120,6 @@ export default function ChatPage() {
     };
   }, [user]);
 
-  // Browser Title Notification
-  useEffect(() => {
-    const unreadConvosTotal = Object.keys(unreadCounts).length;
-    if (unreadConvosTotal > 0) {
-      document.title = `(${unreadConvosTotal}) Chat - Portfolio OS`;
-    } else {
-      document.title = `Chat - Portfolio OS`;
-    }
-  }, [unreadCounts]);
-
   // Load Messages for Active Conversation & Subscribe to it
   useEffect(() => {
     if (!activeConvId) return;
@@ -272,7 +262,7 @@ export default function ChatPage() {
   const activeConv = conversations.find(c => c.id === activeConvId);
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-4 duration-700 relative overflow-hidden">
+    <div className="flex gap-6 h-full animate-in fade-in slide-in-from-bottom-4 duration-700 relative overflow-hidden">
       {/* Sidebar: Conversation List */}
       <div className={cn(
         "w-full md:w-96 flex flex-col bg-card border rounded-3xl shadow-xl overflow-hidden glassmorphism border-primary/10 transition-all duration-300",
