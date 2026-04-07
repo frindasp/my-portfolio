@@ -132,15 +132,15 @@ model HistoryActivityUser {
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
-  email     String
-  name      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(cuid())
+  email      String
+  name       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   roleId     String?
   title      String?
-  userAlias  String?
   adminAlias String?
+  userAlias  String?
   Message    Message[]
 }
 
@@ -150,7 +150,10 @@ model ConversationReadState {
   userId         String
   lastReadAt     DateTime @default(now())
   isRead         Boolean  @default(true)
+  isArchived     Boolean  @default(false)
+  isFavorite     Boolean  @default(false)
+  isMuted        Boolean  @default(false)
+  isPinned       Boolean  @default(false)
 
   @@unique([conversationId, userId])
 }
-

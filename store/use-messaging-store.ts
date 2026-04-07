@@ -2,7 +2,16 @@ import { create } from "zustand";
 import { Message, Conversation } from "@prisma/client";
 
 export type ConversationWithLastMessage = Conversation & {
-  Message: Message[];
+  Message: any[];
+  userState?: {
+    isRead?: boolean;
+    isPinned?: boolean;
+    isFavorite?: boolean;
+    isArchived?: boolean;
+    isMuted?: boolean;
+  };
+  userAlias?: string | null;
+  adminAlias?: string | null;
 };
 
 interface MessagingState {
