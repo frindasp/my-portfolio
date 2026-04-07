@@ -658,6 +658,61 @@ export async function getConversations(email?: string, userId?: string) {
   });
 }
 
+export async function getUnreadConversationCounts(email?: string, userId?: string) {
+  const currentUser = await getCurrentUser();
+  const resolvedEmail = (currentUser?.email || email)?.trim().toLowerCase();
+  const resolvedUserId = currentUser?.id || userId || null;
+
+  if (!resolvedEmail && !resolvedUserId) return {};
+
+  const unreadMessages = await prisma.message.findMany({
+    where: {
+      isAdmin: true,
+      isRead: false,
+      conversationId: { not: null },
+      Conversation: {
+        OR: [
+          { email: resolvedEmail || undefined },
+          {
+            Message: {
+              some: {
+                senderId: resolvedUserId || undefined,
+              },
+            },
+          },
+        ],
+      },
+    },
+    select: {
+      conversationId: true,
+    },
+  });
+
+  return unreadMessages.reduce<Record<string, number>>((acc, item) => {
+    const convId = item.conversationId;
+    if (!convId) return acc;
+    acc[convId] = (acc[convId] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+export async function markConversationAsRead(conversationId: string) {
+  if (!conversationId) return { success: false, error: "Conversation ID is required" };
+
+  await prisma.message.updateMany({
+    where: {
+      conversationId,
+      isAdmin: true,
+      isRead: false,
+    },
+    data: {
+      isRead: true,
+    },
+  });
+
+  return { success: true };
+}
+
 
 /**
  * Handle creation of a new conversation thread
