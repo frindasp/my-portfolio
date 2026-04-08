@@ -115,7 +115,7 @@ export default function About() {
       <section>
         <div className="flex items-center gap-2 mb-8">
           <Briefcase className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-2xl font-semibold tracking-tight">Pengalaman</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Experiences</h2>
         </div>
 
         <ol className="relative border-l border-border space-y-10 ml-3">
