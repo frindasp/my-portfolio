@@ -68,8 +68,8 @@ export function PortfolioDetail({ id }: { id: string }) {
     )
   }
 
-  const images = portfolio.images as string[]
-  const tags = portfolio.tags as string[]
+  const images = portfolio.PortfolioImage || []
+  const tags = portfolio.Tag || []
   const exp = portfolio.Experience
 
   return (
@@ -88,8 +88,8 @@ export function PortfolioDetail({ id }: { id: string }) {
         <div className="space-y-3">
           {/* Main image */}
           <div className="relative overflow-hidden rounded-xl border border-border bg-muted aspect-video">
-            <img
-              src={images[activeImg]}
+             <img
+              src={images[activeImg].url}
               alt={`${portfolio.title} — image ${activeImg + 1}`}
               className="w-full h-full object-cover transition-opacity duration-300"
             />
@@ -98,9 +98,9 @@ export function PortfolioDetail({ id }: { id: string }) {
           {/* Thumbnails */}
           {images.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {images.map((img, i) => (
+               {images.map((img, i) => (
                 <button
-                  key={i}
+                  key={img.id}
                   onClick={() => setActiveImg(i)}
                   className={`shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
                     i === activeImg
@@ -108,7 +108,7 @@ export function PortfolioDetail({ id }: { id: string }) {
                       : "border-transparent hover:border-border"
                   }`}
                 >
-                  <img src={img} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                  <img src={img.url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -123,13 +123,13 @@ export function PortfolioDetail({ id }: { id: string }) {
         {/* Tags */}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
+             {tags.map((tag) => (
               <span
-                key={tag}
+                key={tag.id}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-border bg-muted text-muted-foreground"
               >
                 <Tag className="w-3 h-3" />
-                {tag}
+                {tag.name}
               </span>
             ))}
           </div>

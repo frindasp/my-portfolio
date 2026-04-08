@@ -193,30 +193,57 @@ model Skill {
 }
 
 model ExperienceImage {
-  id           String     @id
-  url          String
-  fileId       String
-  caption      String?
-  order        Int        @default(0)
-  experienceId String
-  createdAt    DateTime   @default(now())
-  Experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  id             String           @id
+  url            String
+  fileId         String?
+  caption        String?
+  order          Int              @default(0)
+  experienceId   String
+  createdAt      DateTime         @default(now())
+  isLogo         Boolean          @default(false)
+  source         String           @default("imagekit")
+  Experience     Experience       @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  PortfolioImage PortfolioImage[]
 
   @@index([experienceId])
 }
 
 model Portfolio {
-  id           String      @id
-  title        String
-  description  String?     @db.Text
-  images       Json
-  tags         Json
-  experienceId String?
-  order        Int         @default(0)
-  isPublished  Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime
-  Experience   Experience? @relation(fields: [experienceId], references: [id])
+  id             String           @id
+  title          String
+  description    String?          @db.Text
+  experienceId   String?
+  order          Int              @default(0)
+  isPublished    Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  Experience     Experience?      @relation(fields: [experienceId], references: [id])
+  PortfolioImage PortfolioImage[]
+  Tag            Tag[]
 
   @@index([experienceId])
+}
+
+model PortfolioImage {
+  id                String           @id
+  url               String
+  fileId            String?
+  source            String           @default("imagekit")
+  isLogo            Boolean          @default(false)
+  order             Int              @default(0)
+  portfolioId       String
+  experienceImageId String?
+  createdAt         DateTime         @default(now())
+  ExperienceImage   ExperienceImage? @relation(fields: [experienceImageId], references: [id])
+  Portfolio         Portfolio        @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([experienceImageId], map: "PortfolioImage_experienceImageId_fkey")
+  @@index([portfolioId])
+}
+
+model Tag {
+  id        String      @id
+  name      String      @unique
+  createdAt DateTime    @default(now())
+  Portfolio Portfolio[]
 }

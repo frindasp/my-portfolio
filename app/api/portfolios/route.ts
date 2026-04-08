@@ -12,6 +12,10 @@ export async function GET() {
         Experience: {
           select: { id: true, company: true, role: true },
         },
+        PortfolioImage: {
+          orderBy: { order: "asc" },
+        },
+        Tag: true,
       },
     })
     return NextResponse.json(portfolios)

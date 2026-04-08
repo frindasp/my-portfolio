@@ -11,9 +11,9 @@ interface PortfolioCardProps {
 }
 
 export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
-  const images = portfolio.images as string[]
-  const tags = portfolio.tags as string[]
-  const coverImage = images[0]
+  const images = portfolio.PortfolioImage || []
+  const tags = portfolio.Tag || []
+  const coverImage = images.find((img) => img.isLogo)?.url || images[0]?.url
 
   return (
     <Link
@@ -83,11 +83,11 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
           <div className="flex flex-wrap gap-1 mt-1">
             {tags.slice(0, 4).map((tag) => (
               <span
-                key={tag}
+                key={tag.id}
                 className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border border-border bg-muted text-muted-foreground"
               >
                 <Tag className="w-2.5 h-2.5" />
-                {tag}
+                {tag.name}
               </span>
             ))}
             {tags.length > 4 && (

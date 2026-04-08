@@ -42,18 +42,33 @@ export interface PortfolioExperience {
   Skill?: Skill[]
 }
 
+export interface PortfolioImage {
+  id: string
+  url: string
+  fileId?: string | null
+  source: string
+  isLogo: boolean
+  order: number
+  portfolioId: string
+}
+
+export interface Tag {
+  id: string
+  name: string
+}
+
 export interface Portfolio {
   id: string
   title: string
   description?: string | null
-  images: string[]   // array of image URLs
-  tags: string[]
   experienceId?: string | null
   order: number
   isPublished: boolean
   createdAt: string
   updatedAt: string
   Experience?: PortfolioExperience | null
+  PortfolioImage: PortfolioImage[]
+  Tag: Tag[]
 }
 
 export interface AboutData {

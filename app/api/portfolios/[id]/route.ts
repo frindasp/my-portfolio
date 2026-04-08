@@ -24,6 +24,10 @@ export async function GET(
             Skill: { select: { id: true, name: true } },
           },
         },
+        PortfolioImage: {
+          orderBy: { order: "asc" },
+        },
+        Tag: true,
       },
     })
     if (!portfolio || !portfolio.isPublished) {

@@ -16,6 +16,7 @@ import Link from "next/link";
 import { getCurrentUser, getTotalMessageCount } from "@/app/actions/auth";
 import { getRecentActivities } from "@/app/actions/history";
 import { cn } from "@/lib/utils";
+import { AlgoliaSyncButton } from "@/components/search/algolia-sync-button";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
@@ -136,6 +137,7 @@ export default function DashboardPage() {
           <div className="space-y-3 sm:space-y-4">
             {[
               { label: "Database", status: "Operational", color: "text-emerald-500", dot: "bg-emerald-500" },
+              { label: "Algolia Search", status: "Connected", color: "text-emerald-500", dot: "bg-emerald-500" },
               { label: "Socket.io", status: "Active", color: "text-emerald-500", dot: "bg-emerald-500" },
               { label: "Push Notifications", status: "Standby", color: "text-amber-500", dot: "bg-amber-500" },
             ].map((mod, i) => (
@@ -148,7 +150,8 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          <div className="mt-auto pt-4">
+          <div className="mt-auto space-y-3 pt-6">
+            <AlgoliaSyncButton />
             <Button className="w-full h-11 sm:h-12 rounded-2xl font-bold bg-neutral-900 text-white hover:bg-neutral-800 shadow-lg">System Logs</Button>
           </div>
         </div>
