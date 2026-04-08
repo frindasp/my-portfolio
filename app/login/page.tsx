@@ -30,7 +30,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [otp, setOtp] = useState("");
-  const [mode, setMode] = useState<"password" | "otp" | "forgot" | "passkey-2fa">("password");
+  const [mode, setMode] = useState<"password" | "otp" | "forgot" | "passkey-2fa" | "register">("password");
   const [step, setStep] = useState(1); // 1: Input, 2: Verification
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -137,11 +137,10 @@ function LoginForm() {
     try {
       const res = await sendVerificationOTP(email);
       if (res.success) {
-        toast.success(res.message || "OTP generated! Please ask admin for your code.");
-        if (!(res as any).isRegistered && (res as any).isContact) {
-          setIsNewUserFromContact(true);
-        } else {
-          setIsNewUserFromContact(false);
+        toast.success(res.message || "OTP requested! Please ask admin for your code.");
+        // If registering, we know they are a new user. 
+        if (mode === "register") {
+          setIsNewUserFromContact(true); // Reusing this state to ensure they enter a new password
         }
         setStep(2);
         setCountdown(60);
@@ -155,10 +154,19 @@ function LoginForm() {
     }
   };
 
-  // Handle OTP Verification (Standard & Admin 2FA)
   const handleVerifyOTP = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!otp || otp.length < 6) return;
+    if (isNewUserFromContact || mode === "register") {
+      if (!password || password.length < 6) {
+        toast.error("Password minimal 6 karakter");
+        return;
+      }
+      if (password !== confirmNewPassword) {
+        toast.error("Konfirmasi password tidak cocok");
+        return;
+      }
+    }
     
     setLoading(true);
     try {
@@ -252,7 +260,7 @@ function LoginForm() {
     try {
       const res = mode === "forgot" ? await forgotPassword(email) : await sendVerificationOTP(email);
       if (res.success) {
-        toast.success(res.message || "Kode baru berhasil digenerate, silahkan minta ke admin");
+        toast.success(res.message || "Kode baru berhasil dikirim, silahkan minta ke admin");
         setCountdown(60);
       } else {
         toast.error(res.error || "Gagal menggenerate ulang kode");
@@ -355,10 +363,11 @@ function LoginForm() {
             {mode === "passkey-2fa" && <ShieldCheck className="h-8 w-8 text-primary animate-pulse" />}
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight">
-            {mode === "forgot" ? "Reset Password" : mode === "passkey-2fa" ? "Verification" : "Welcome Back"}
+            {mode === "forgot" ? "Reset Password" : mode === "passkey-2fa" ? "Verification" : mode === "register" ? "Create Account" : "Welcome Back"}
           </h1>
           <p className="text-muted-foreground text-sm">
-             {mode === "otp" && (step === 1 ? "Sign in with a one-time code." : isNewUserFromContact ? "Finish your registration." : `Confirm code sent to ${email}`)}
+             {mode === "otp" && (step === 1 ? "Sign in with a one-time code." : "Confirm code sent to you.")}
+             {mode === "register" && (step === 1 ? "Enter your email to request an admin OTP." : "Enter the OTP from admin and set your password.")}
              {mode === "password" && "Enter your credentials to continue."}
              {mode === "forgot" && (step === 1 ? "Enter your email for the reset code." : "Enter code and new password.")}
              {mode === "passkey-2fa" && (
@@ -372,7 +381,7 @@ function LoginForm() {
         {/* STEP 1: Login Inputs */}
         {step === 1 ? (
           <div className="space-y-6">
-            <form onSubmit={mode === "password" ? handlePasswordLogin : mode === "otp" ? handleRequestOTP : handleForgotPassword} className="space-y-4">
+            <form onSubmit={mode === "password" ? handlePasswordLogin : mode === "otp" || mode === "register" ? handleRequestOTP : handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Email Address</label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl h-12 bg-muted/30 focus:bg-background border-muted" disabled={loading} />
@@ -406,7 +415,7 @@ function LoginForm() {
 
               <div className="space-y-3 pt-2">
                 <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]" disabled={loading || !email}>
-                  {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (mode === "password" ? "Sign In" : "Send Code")}
+                  {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (mode === "password" ? "Sign In" : mode === "register" ? "Request OTP" : "Send Code")}
                 </Button>
                 
                 {mode === "forgot" && (
@@ -419,6 +428,18 @@ function LoginForm() {
                   >
                     <Fingerprint className="mr-2 h-4 w-4" /> Verify with Passkey instead
                   </Button>
+                )}
+                
+                {mode === "password" && (
+                  <div className="text-center mt-2">
+                    <p className="text-xs text-muted-foreground">Belum punya akun? <button type="button" onClick={() => { setMode("register"); setStep(1); }} className="text-primary hover:underline font-bold">Daftar</button></p>
+                  </div>
+                )}
+                
+                {mode === "register" && (
+                  <div className="text-center mt-2">
+                    <p className="text-xs text-muted-foreground">Sudah punya akun? <button type="button" onClick={() => { setMode("password"); setStep(1); }} className="text-primary hover:underline font-bold">Masuk</button></p>
+                  </div>
                 )}
               </div>
             </form>
@@ -576,7 +597,7 @@ function LoginForm() {
                   <Input type="text" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} required className="rounded-xl h-12 text-center text-2xl tracking-[0.5em] font-mono bg-muted/30 focus:bg-background border-muted" disabled={loading} autoFocus />
                 </div>
     
-                {(mode === "forgot" || (mode === "otp" && isNewUserFromContact)) && (
+                {(mode === "forgot" || mode === "register" || (mode === "otp" && isNewUserFromContact)) && (
                    <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{mode === "forgot" ? "New Password" : "Set Password"}</label>
                       <div className="relative">
@@ -599,7 +620,7 @@ function LoginForm() {
                    </div>
                 )}
     
-                {(mode === "forgot" || (mode === "otp" && isNewUserFromContact)) && (
+                {(mode === "forgot" || mode === "register" || (mode === "otp" && isNewUserFromContact)) && (
                    <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Confirm {mode === "forgot" ? "New Password" : "Password"}</label>
                       <div className="relative">
@@ -626,7 +647,7 @@ function LoginForm() {
                 )}
     
                 <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20" disabled={loading || otp.length < 6}>
-                  {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (mode === "forgot" ? "Reset & Update" : isNewUserFromContact ? "Register & Login" : "Verify & Login")}
+                  {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (mode === "forgot" ? "Reset & Update" : mode === "register" || isNewUserFromContact ? "Register & Login" : "Verify & Login")}
                 </Button>
                 
                 <div className="text-center">

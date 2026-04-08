@@ -39,8 +39,6 @@ import {
   getMessages,
   sendChatMessage,
   createConversation,
-  syncMessageOwnership,
-  getMessageOwnershipDiff,
   getUnreadConversationCounts,
   markConversationAsRead,
   updateConversationAlias,
@@ -56,12 +54,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
-export default function ChatWindow() {
+import React from "react";
+
+export default function ChatWindow(): React.ReactElement | null {
   const { 
     messages, setMessages, addMessage, 
     conversations, setConversations, 
     activeConvId, setActiveConv,
-    userId, userEmail, isRegistered, userName 
+    userId, userEmail, isRegistered, userName, guestSessionId
   } = useMessagingStore();
   
   const [userNickname, setUserNickname] = useState("");
@@ -73,8 +73,6 @@ export default function ChatWindow() {
   const [sending, setSending] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [syncingOwnership, setSyncingOwnership] = useState(false);
-  const [ownershipDiffCount, setOwnershipDiffCount] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [filterTab, setFilterTab] = useState("all"); 
@@ -89,21 +87,19 @@ export default function ChatWindow() {
   }, []);
 
   useEffect(() => {
-    if (userEmail) {
-      Promise.all([getConversations(), getUnreadConversationCounts()]).then(
+    const emailToUse = userEmail || (guestSessionId ? `${guestSessionId}@guest.com` : null);
+    if (emailToUse) {
+      Promise.all([
+        getConversations(emailToUse, userId || guestSessionId || undefined), 
+        getUnreadConversationCounts(emailToUse, userId || guestSessionId || undefined)
+      ]).then(
         ([loadedConversations, unreadMap]) => {
           setConversations(loadedConversations as ConversationWithLastMessage[]);
           setUnreadCounts(unreadMap || {});
         },
       );
-      
-      if (userId) {
-        getMessageOwnershipDiff(userEmail, userId).then((result) => {
-          setOwnershipDiffCount(result.pendingCount);
-        });
-      }
     }
-  }, [userEmail, userId, setConversations]);
+  }, [userEmail, userId, guestSessionId, setConversations]);
 
   useEffect(() => {
     const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + (count > 0 ? count : 0), 0);
@@ -198,7 +194,9 @@ export default function ChatWindow() {
 
     setSending(true);
     try {
-      const result = await sendChatMessage(content, userEmail || undefined, userId || undefined, activeConvId);
+      const emailToUse = userEmail || `${guestSessionId}@guest.com`;
+      const idToUse = userId || undefined; 
+      const result = await sendChatMessage(content, emailToUse, idToUse, activeConvId);
       if (result.success && result.message) {
         setContent("");
       } else {
@@ -212,7 +210,7 @@ export default function ChatWindow() {
   };
 
   const handleCreateConversation = async () => {
-    if (!newTitle.trim() || isCreating || !userEmail) return;
+    if (!newTitle.trim() || isCreating) return;
 
     setIsCreating(true);
     try {
@@ -228,27 +226,6 @@ export default function ChatWindow() {
       toast.error("An error occurred");
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const handleSyncOwnership = async () => {
-    if (!userEmail || !userId || syncingOwnership || ownershipDiffCount === 0) return;
-
-    setSyncingOwnership(true);
-    try {
-      const result = await syncMessageOwnership(userEmail, userId);
-      if (result.success) {
-        setOwnershipDiffCount(0);
-        const refreshed = await getConversations();
-        setConversations(refreshed as ConversationWithLastMessage[]);
-        toast.success(`${result.updatedCount} chat lama berhasil dipadankan`);
-      } else {
-        toast.error(result.error || "Gagal memadankan chat lama");
-      }
-    } catch (error) {
-      toast.error("Gagal memadankan chat lama");
-    } finally {
-      setSyncingOwnership(false);
     }
   };
 
@@ -362,7 +339,7 @@ export default function ChatWindow() {
                 variant="ghost" 
                 className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded-lg h-7 w-7"
                 onClick={handleCreateConversation}
-                disabled={isCreating || !newTitle.trim() || (!userEmail && !isRegistered)}
+                disabled={isCreating || !newTitle.trim() || (!userEmail && !guestSessionId)}
               >
                 {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               </Button>
@@ -398,7 +375,7 @@ export default function ChatWindow() {
                           {c.userState?.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 rotate-45" />}
                           <p className="text-[11px] font-bold truncate leading-tight">{c.title || "Support"}</p>
                        </div>
-                       <span className="text-[8px] opacity-40 font-mono whitespace-nowrap">{formatDistanceToNow(new Date(c.updatedAt), { addSuffix: false })}</span>
+                       <span className="text-[8px] font-mono whitespace-nowrap">{formatDistanceToNow(new Date(c.updatedAt), { addSuffix: false })}</span>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                        <p className="text-[10px] text-muted-foreground truncate flex-1 opacity-70">
@@ -532,7 +509,7 @@ export default function ChatWindow() {
               key={msg.id}
               className={cn(
                 "flex flex-col max-w-[85%] rounded-2xl px-4 py-2.5 text-sm transition-all animate-in fade-in duration-500",
-                msg.senderId === userId || msg.senderEmail === userEmail
+                (msg.senderId === userId || msg.senderEmail === userEmail || (!userId && msg.senderEmail === `${guestSessionId}@guest.com`) || msg.isAdmin === false)
                   ? "self-end bg-primary text-primary-foreground rounded-tr-none shadow-md shadow-primary/10"
                   : "self-start bg-background text-foreground rounded-tl-none border shadow-sm"
               )}
@@ -546,24 +523,9 @@ export default function ChatWindow() {
         )}
       </div>
 
-      {!isRegistered && userEmail && (
+      {!isRegistered && (
         <div className="px-4 py-2 bg-primary/5 text-[10px] text-center text-primary/80 border-t border-t-primary/10">
-          Chatting sebagai <strong>{userEmail}</strong>. <button onClick={() => setShowAuth(true)} className="underline font-bold">Daftar</button> untuk menyimpan riwayat.
-        </div>
-      )}
-
-      {isRegistered && userEmail && userId && ownershipDiffCount > 0 && !activeConvId && (
-        <div className="px-4 py-2 bg-amber-500/10 text-[10px] text-center text-amber-700 border-t border-t-amber-500/20">
-          Ditemukan <strong>{ownershipDiffCount}</strong> chat lama belum ditandai.
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleSyncOwnership}
-            disabled={syncingOwnership}
-            className="ml-2 h-6 px-2 text-[10px]"
-          >
-            {syncingOwnership ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Padankan
-          </Button>
+          Chatting as Guest. <button onClick={() => setShowAuth(true)} className="underline font-bold text-primary">Login / Register</button> to save history.
         </div>
       )}
 

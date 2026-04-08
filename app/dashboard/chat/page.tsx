@@ -7,8 +7,6 @@ import {
   getMessages,
   sendChatMessage,
   createConversation,
-  syncMessageOwnership,
-  getMessageOwnershipDiff,
   getUnreadConversationCounts,
   markConversationAsRead,
   updateConversationAlias,
@@ -73,7 +71,6 @@ export default function ChatPage() {
   const [user, setUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [isEditingAlias, setIsEditingAlias] = useState(false);
   const [userNickname, setUserNickname] = useState("");
@@ -93,8 +90,6 @@ export default function ChatPage() {
         setUnreadCounts(unreadMap || {});
         const total = (Object.values(unreadMap || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
         setGlobalUnreadCount(total);
-        const diff = await getMessageOwnershipDiff(currentUser.email, currentUser.id);
-        setPendingSyncCount(diff.pendingCount || 0);
         if (convs.length > 0) setActiveConvId(convs[0].id);
       }
       setLoading(false);
@@ -196,20 +191,7 @@ export default function ChatPage() {
     finally { setIsCreating(false); }
   };
 
-  const handleSync = async () => {
-    if (!user || syncing) return;
-    setSyncing(true);
-    try {
-      const res = await syncMessageOwnership(user.email, user.id);
-      if (res.success) {
-        const convs = await getConversations();
-        setConversations(convs);
-        setPendingSyncCount(0);
-        toast.success(`${res.updatedCount} messages synchronized!`);
-      }
-    } catch (err) { toast.error("Sync failed"); }
-    finally { setSyncing(false); }
-  };
+
 
   const handleUpdateAlias = async () => {
     if (!activeConvId) return;
@@ -319,8 +301,8 @@ export default function ChatPage() {
             <h2 className="text-sm font-bold tracking-tight flex items-center gap-2">
               <MessageCircle className="h-4 w-4 text-primary" /> Threads
             </h2>
-            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={handleSync} disabled={pendingSyncCount === 0 || syncing}>
-               {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className={cn("h-3 w-3", pendingSyncCount > 0 && "text-primary animate-pulse")} />}
+            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => {}} disabled={true}>
+               <RefreshCw className="h-3 w-3 opacity-20" />
             </Button>
           </div>
           <div className="flex items-center gap-1 p-1 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar">

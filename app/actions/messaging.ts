@@ -11,14 +11,18 @@ import { pusherServer } from "@/lib/pusher";
 const prisma = new PrismaClient();
 
 /**
- * Check if the email has ever contacted or is registered
+ * Logout user
+ */
+export async function logout() {
+  const cookieStore = await cookies();
+  cookieStore.delete("portfolio_session");
+  return { success: true };
+}
+
+/**
+ * Check if the email is registered
  */
 export async function checkEmailStatus(email: string) {
-  const existingContact = await prisma.contact.findFirst({
-    where: { email },
-    orderBy: { createdAt: "desc" },
-  });
-
   const userRole = await getOrCreateRole("User");
 
   // Use email_roleId compound unique as defined in schema
@@ -32,8 +36,8 @@ export async function checkEmailStatus(email: string) {
   });
 
   return {
-    hasContacted: !!existingContact,
-    lastContactName: existingContact?.name || null,
+    hasContacted: false,
+    lastContactName: null,
     isRegistered: !!registeredUser,
   };
 }
@@ -51,10 +55,6 @@ export async function sendVerificationOTP(
     const userRole = await getOrCreateRole("User");
     const user = await prisma.user.findUnique({
       where: { email_roleId: { email, roleId: userRole.id } },
-    });
-
-    const isContact = await prisma.contact.findFirst({
-      where: { email },
     });
 
     // Upsert token in VerificationToken model
@@ -75,7 +75,7 @@ export async function sendVerificationOTP(
       message:
         "Verification code generated. Please contact admin for your code.",
       isRegistered: !!user,
-      isContact: !!isContact,
+      isContact: false,
     } as any;
   } catch (err) {
     console.error("sendVerificationOTP error:", err);
@@ -223,7 +223,6 @@ export async function verifyOTPAndLogin(
     return {
       success: false,
       error: "User not found. Please register first.",
-      isContact: !!(await prisma.contact.findFirst({ where: { email } })),
     };
   }
 
@@ -239,31 +238,6 @@ export async function verifyOTPAndLogin(
         senderId: user.id,
       },
     });
-
-    const matchedContacts = await prisma.contact.findMany({
-      where: { email },
-      select: { id: true },
-    });
-
-    if (matchedContacts.length > 0) {
-      await prisma.message.updateMany({
-        where: {
-          contactId: { in: matchedContacts.map((contact) => contact.id) },
-          isAdmin: false,
-          OR: [
-            { senderId: null },
-            {
-              senderEmail: email,
-              senderId: { not: user.id },
-            },
-          ],
-        },
-        data: {
-          senderId: user.id,
-          senderEmail: email,
-        },
-      });
-    }
 
     console.log(`Auto-merged messages for ${email}`);
   } catch (mergeError) {
@@ -389,236 +363,118 @@ export async function getMessages(email?: string, userId?: string, conversationI
   if (!email && !userId) return [];
 
   const normalizedEmail = email?.trim().toLowerCase();
-  const matchedContacts = normalizedEmail
-    ? await prisma.contact.findMany({
-        where: { email: normalizedEmail },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          message: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "asc" },
-      })
-    : [];
-
-  const contactIds = matchedContacts.map((contact) => contact.id);
 
   const messages = await prisma.message.findMany({
     where: {
       OR: [
         ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
-        { senderId: userId },
-        ...(contactIds.length ? [{ contactId: { in: contactIds } }] : []),
+        ...(userId ? [{ senderId: userId }] : []),
       ],
     },
     orderBy: { createdAt: "asc" },
     include: { User: { select: { name: true, email: true } } },
   });
 
-  // Fallback: if a contact entry exists but has never been materialized to Message,
-  // expose it in the chat list so user can review/match it first.
-  const materializedContactIds = new Set(
-    messages
-      .filter((message) => message.contactId)
-      .map((message) => message.contactId as string),
-  );
-
-  const contactBackfills = matchedContacts
-    .filter((contact) => !materializedContactIds.has(contact.id))
-    .map((contact) => ({
-      id: `contact-${contact.id}`,
-      content: `[Kontak] ${contact.message}`,
-      senderId: userId || null,
-      senderEmail: contact.email,
-      contactId: contact.id,
-      isAdmin: false,
-      createdAt: contact.createdAt,
-    }));
-
-  return [...messages, ...contactBackfills].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  ) as any;
-}
-
-
-export async function getMessageOwnershipDiff(email?: string, userId?: string) {
-  if (!email || !userId) {
-    return { canSync: false, pendingCount: 0 };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const matchedContacts = await prisma.contact.findMany({
-    where: { email: normalizedEmail },
-    select: { id: true },
-  });
-
-  const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
-  const contactIds = Array.from(contactIdSet);
-
-  const orphanContactCount = contactIds.length
-    ? await prisma.contact.count({
-        where: {
-          id: { in: contactIds },
-          Messages: {
-            none: {
-              isAdmin: false,
-            },
-          },
-        },
-      })
-    : 0;
-
-  const candidateMessages = await prisma.message.findMany({
-    where: {
-      isAdmin: false,
-      OR: [
-        { senderEmail: normalizedEmail },
-        ...(contactIdSet.size
-          ? [{ contactId: { in: contactIds }, senderEmail: null }]
-          : []),
-      ],
-      AND: [
-        {
-          OR: [{ senderId: null }, { senderId: { not: userId } }],
-        },
-      ],
-    },
-    select: {
-      id: true,
-    },
-  });
-  const pendingCount = candidateMessages.length + orphanContactCount;
-
-  return {
-    canSync: pendingCount > 0,
-    pendingCount,
-  };
-}
-
-export async function syncMessageOwnership(email?: string, userId?: string) {
-  if (!email || !userId) {
-    return { success: false, updatedCount: 0, error: "Unauthorized" };
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const matchedContacts = await prisma.contact.findMany({
-    where: { email: normalizedEmail },
-    select: { id: true, message: true, createdAt: true },
-  });
-
-  const contactIdSet = new Set(matchedContacts.map((contact) => contact.id));
-  const contactIds = Array.from(contactIdSet);
-  const candidateMessages = await prisma.message.findMany({
-    where: {
-      isAdmin: false,
-      OR: [
-        { senderEmail: normalizedEmail },
-        ...(contactIdSet.size
-          ? [{ contactId: { in: contactIds }, senderEmail: null }]
-          : []),
-      ],
-      AND: [
-        {
-          OR: [{ senderId: null }, { senderId: { not: userId } }],
-        },
-      ],
-    },
-    select: {
-      id: true,
-    },
-  });
-  const messageIdsToClaim = candidateMessages.map((message) => message.id);
-
-  if (messageIdsToClaim.length === 0) {
-    const existingMessageContactIds = contactIds.length
-      ? await prisma.message.findMany({
-          where: {
-            contactId: { in: contactIds },
-            isAdmin: false,
-          },
-          select: { contactId: true },
-        })
-      : [];
-
-    const existingSet = new Set(
-      existingMessageContactIds
-        .map((item) => item.contactId)
-        .filter((id): id is string => !!id),
-    );
-
-    const contactsToMaterialize = matchedContacts.filter(
-      (contact) => !existingSet.has(contact.id),
-    );
-    if (contactsToMaterialize.length === 0) {
-      return { success: true, updatedCount: 0 };
-    }
-
-    const created = await prisma.message.createMany({
-      data: contactsToMaterialize.map((contact) => ({
-        content: `[Kontak] ${contact.message}`,
-        senderId: userId,
-        senderEmail: normalizedEmail,
-        contactId: contact.id,
-        isAdmin: false,
-        createdAt: contact.createdAt,
-      })),
-    });
-
-    return { success: true, updatedCount: created.count };
-  }
-
-  const updated = await prisma.message.updateMany({
-    where: {
-      id: { in: messageIdsToClaim },
-    },
-    data: {
-      senderId: userId,
-      senderEmail: normalizedEmail,
-    },
-  });
-
-  // Also materialize contacts that still do not have any user message row.
-  const existingMessageContactIds = contactIds.length
-    ? await prisma.message.findMany({
-        where: {
-          contactId: { in: contactIds },
-          isAdmin: false,
-        },
-        select: { contactId: true },
-      })
-    : [];
-
-  const existingSet = new Set(
-    existingMessageContactIds
-      .map((item) => item.contactId)
-      .filter((id): id is string => !!id),
-  );
-  const contactsToMaterialize = matchedContacts.filter(
-    (contact) => !existingSet.has(contact.id),
-  );
-
-  let createdCount = 0;
-  if (contactsToMaterialize.length > 0) {
-    const created = await prisma.message.createMany({
-      data: contactsToMaterialize.map((contact) => ({
-        content: `[Kontak] ${contact.message}`,
-        senderId: userId,
-        senderEmail: normalizedEmail,
-        contactId: contact.id,
-        isAdmin: false,
-        createdAt: contact.createdAt,
-      })),
-    });
-    createdCount = created.count;
-  }
-
-  return { success: true, updatedCount: updated.count + createdCount };
+  return messages;
 }
 
 /**
- * Get all conversations for a user or all for admin
+ * Create a new conversation
+ */
+export async function createConversation(title: string) {
+  const user = await getCurrentUser();
+  if (!user) return { success: false, error: "Unauthorized" };
+
+  try {
+    const conversation = await prisma.conversation.create({
+      data: {
+        email: user.email,
+        name: user.name || user.email.split("@")[0],
+        title,
+      }
+    });
+    return { success: true, conversation };
+  } catch (error) {
+    return { success: false, error: "Failed to create conversation" };
+  }
+}
+
+/**
+ * Send a chat message
+ */
+export async function sendChatMessage(
+  content: string,
+  email?: string,
+  userId?: string,
+  conversationId?: string,
+) {
+  if (!content.trim()) return { success: false, error: "Content is required" };
+
+  try {
+    let finalConvId = conversationId;
+
+    // If no conversationId, try to find or create one for this user/email
+    if (!finalConvId && (email || userId)) {
+      const emailToUse = email?.trim().toLowerCase();
+      
+      let existingConv = await prisma.conversation.findFirst({
+        where: {
+          OR: [
+            ...(emailToUse ? [{ email: emailToUse }] : []),
+            ...(userId ? [{ Message: { some: { senderId: userId } } }] : [])
+          ]
+        },
+        orderBy: { updatedAt: "desc" }
+      });
+
+      if (!existingConv) {
+        existingConv = await prisma.conversation.create({
+          data: {
+            email: emailToUse || "guest@anonymous.com",
+            name: emailToUse ? emailToUse.split("@")[0] : "Guest",
+            title: "Live Chat Session",
+          }
+        });
+      }
+      finalConvId = existingConv.id;
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        content,
+        senderEmail: email || null,
+        senderId: userId || null,
+        conversationId: finalConvId || null,
+        isAdmin: false,
+      },
+      include: {
+        User: { select: { name: true, email: true } },
+      }
+    });
+
+    if (finalConvId) {
+      await prisma.conversation.update({
+        where: { id: finalConvId },
+        data: { updatedAt: new Date() }
+      });
+
+      // Trigger Pusher
+      await pusherServer.trigger(`conversation-${finalConvId}`, "new-message", {
+        ...message,
+        senderRole: "user",
+        sender: { name: message.User?.name || message.senderEmail || "Guest" }
+      });
+    }
+
+    return { success: true, message };
+  } catch (error) {
+    console.error("sendChatMessage error:", error);
+    return { success: false, error: "Failed to send message" };
+  }
+}
+
+/**
+ * Get all conversations for a user
  */
 export async function getConversations(email?: string, userId?: string) {
   const currentUser = await getCurrentUser();
@@ -657,10 +513,10 @@ export async function getConversations(email?: string, userId?: string) {
     },
   });
 
-  const stateMap = states.reduce((acc, s) => {
+  const stateMap = states.reduce((acc: any, s: any) => {
     acc[s.conversationId] = s;
     return acc;
-  }, {} as Record<string, any>);
+  }, {});
 
   return conversations.map(conv => ({
     ...conv,
@@ -674,6 +530,18 @@ export async function getConversations(email?: string, userId?: string) {
   }));
 }
 
+export async function updateConversationAlias(conversationId: string, userAlias: string, adminAlias: string) {
+  try {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { userAlias, adminAlias }
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
 export async function getUnreadConversationCounts(email?: string, userId?: string) {
   const currentUser = await getCurrentUser();
   const resolvedEmail = (currentUser?.email || email)?.trim().toLowerCase();
@@ -681,8 +549,6 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
 
   if (!resolvedEmail && !resolvedUserId) return {};
 
-  // For each conversation, find the lastReadAt from ConversationReadState
-  // or default to a very old date.
   const allConversations = await prisma.conversation.findMany({
     where: {
       OR: [
@@ -700,7 +566,7 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
   const readStates = await prisma.conversationReadState.findMany({
     where: {
       conversationId: { in: convIds },
-      userId: resolvedUserId || "GUEST", // Use email if no ID? Actually ID is better.
+      userId: resolvedUserId || "GUEST",
     }
   });
 
@@ -716,7 +582,7 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
     const count = await prisma.message.count({
       where: {
         conversationId: convId,
-        isAdmin: true, // User only cares about messages from Admin
+        isAdmin: true,
         createdAt: { gt: state.lastReadAt }
       }
     });
@@ -724,8 +590,7 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
     if (count > 0) {
       unreadMap[convId] = count;
     } else if (!state.isRead) {
-      // Manual Unread: No new messages but user marked as unread
-      unreadMap[convId] = -1; // -1 signifies "dot only"
+      unreadMap[convId] = -1;
     }
   }
 
@@ -747,7 +612,7 @@ export async function markConversationAsRead(conversationId: string, userId?: st
     },
     update: { 
       lastReadAt: new Date(),
-      isRead: true, // Reset manual unread status
+      isRead: true,
     },
     create: {
       conversationId,
@@ -826,259 +691,29 @@ export async function toggleConversationMutedStatus(conversationId: string, isMu
 }
 
 export async function clearConversationMessages(conversationId: string) {
-  if (!conversationId) return { success: false };
-  // Ideally we should delete only for one user (using logic of "cleared at"), 
-  // but for simplicity in this project we might just delete messages.
-  // Actually, deleting messages affects both. 
-  // For now, let's just delete messages linked to this conversation.
-  await prisma.message.deleteMany({
-    where: { conversationId },
-  });
-  return { success: true };
+  try {
+    await prisma.message.deleteMany({
+      where: { conversationId }
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
 }
 
 export async function deleteConversation(conversationId: string) {
-  if (!conversationId) return { success: false };
-  // Cascade delete messages and states
-  await prisma.conversationReadState.deleteMany({ where: { conversationId } });
-  await prisma.message.deleteMany({ where: { conversationId } });
-  await prisma.conversation.delete({ where: { id: conversationId } });
-  return { success: true };
-}
-
-
-/**
- * Handle creation of a new conversation thread
- */
-export async function createConversation(title: string, email?: string) {
-  const currentUser = await getCurrentUser();
-  const resolvedEmail = (currentUser?.email || email)?.trim().toLowerCase();
-
-  if (!resolvedEmail) return { success: false, error: "Unauthorized or missing email" };
-
   try {
-    const userRole = await getOrCreateRole("User");
-    const conversation = await prisma.conversation.create({
-      data: {
-        email: resolvedEmail,
-        name: currentUser?.name || resolvedEmail.split("@")[0] || "Guest",
-        roleId: userRole.id,
-        title: title || "New Conversation",
-        updatedAt: new Date(),
-      },
+    await prisma.conversationReadState.deleteMany({
+      where: { conversationId }
     });
-
-    return { success: true, conversation };
+    await prisma.message.deleteMany({
+      where: { conversationId }
+    });
+    await prisma.conversation.delete({
+      where: { id: conversationId }
+    });
+    return { success: true };
   } catch (error) {
-    console.error("Create Conversation Error:", error);
-    return { success: false, error: "Failed to create conversation" };
+    return { success: false };
   }
-}
-
-export async function updateConversationAlias(conversationId: string, userAlias?: string, adminAlias?: string) {
-  try {
-    const updated = await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { 
-        userAlias: userAlias !== undefined ? userAlias : undefined,
-        adminAlias: adminAlias !== undefined ? adminAlias : undefined,
-      },
-    });
-    return { success: true, conversation: updated };
-  } catch (err) {
-    console.error("Update Alias Error:", err);
-    return { success: false, error: "Failed to update alias" };
-  }
-}
-
-
-/**
- * Send a chat message.
- */
-export async function sendChatMessage(
-  content: string,
-  email?: string,
-  userId?: string,
-  conversationId?: string,
-  title?: string,
-) {
-  const normalizedContent = content.trim();
-  if (!normalizedContent) {
-    return { success: false, error: "Message is empty" };
-  }
-
-  const currentUser = await getCurrentUser();
-  const resolvedEmail = (currentUser?.email || email)?.trim().toLowerCase();
-  const resolvedSenderId = currentUser?.id || userId || null;
-  const userRole = await getOrCreateRole("User");
-
-  let matchedContactId: string | null = null;
-  let activeConversationId = conversationId;
-
-  // Resolve or create conversation if not provided
-  if (!activeConversationId && resolvedEmail) {
-    // If title is provided, try to find an existing one with that title or create new
-    if (title) {
-       // Check if a conversation with this email and title exists
-       const existingConv = await prisma.conversation.findFirst({
-         where: { email: resolvedEmail, title: title }
-       });
-       if (existingConv) {
-         activeConversationId = existingConv.id;
-       } else {
-         const newConv = await prisma.conversation.create({
-           data: {
-             email: resolvedEmail,
-             name: currentUser?.name || resolvedEmail.split("@")[0] || "Guest",
-             roleId: userRole.id,
-             title: title,
-             updatedAt: new Date(),
-           }
-         });
-         activeConversationId = newConv.id;
-       }
-    } else {
-      // Find the latest conversation
-      const latestConv = await prisma.conversation.findFirst({
-        where: { email: resolvedEmail },
-        orderBy: { updatedAt: "desc" }
-      });
-      if (latestConv) {
-        activeConversationId = latestConv.id;
-      } else {
-        // Create a default one
-        const defaultConv = await prisma.conversation.create({
-          data: {
-            email: resolvedEmail,
-            name: currentUser?.name || resolvedEmail.split("@")[0] || "Guest",
-            roleId: userRole.id,
-            title: "General Chat",
-            updatedAt: new Date(),
-          }
-        });
-        activeConversationId = defaultConv.id;
-      }
-    }
-  }
-
-  if (resolvedEmail) {
-    const latestContact = await prisma.contact.findFirst({
-      where: { email: resolvedEmail },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (latestContact) {
-      if (latestContact.message.trim() === normalizedContent) {
-        // We skip duplicate error for conversations to allow similar greetings in different threads
-        // but still log it if needed. 
-      }
-
-      const updatedContact = await prisma.contact.update({
-        where: { id: latestContact.id },
-        data: {
-          message: normalizedContent,
-          name: currentUser?.name || latestContact.name,
-        },
-      });
-      matchedContactId = updatedContact.id;
-    } else {
-      const createdContact = await prisma.contact.create({
-        data: {
-          email: resolvedEmail,
-          message: normalizedContent,
-          name: currentUser?.name || resolvedEmail.split("@")[0] || "Guest",
-        },
-      });
-      matchedContactId = createdContact.id;
-    }
-  }
-
-  const message = await (prisma.message.create as any)({
-    data: {
-      content: normalizedContent,
-      senderEmail: resolvedEmail,
-      senderId: resolvedSenderId,
-      contactId: matchedContactId,
-      conversationId: activeConversationId,
-      isAdmin: currentUser?.Role?.name === "Admin",
-    },
-    include: {
-      User: { select: { name: true, email: true } },
-      Conversation: true,
-    }
-  });
-
-  // Update conversation timestamp
-  if (activeConversationId) {
-    await prisma.conversation.update({
-      where: { id: activeConversationId },
-      data: { updatedAt: new Date() }
-    });
-  }
-
-  // Trigger Pusher for Real-time
-  try {
-    const channel = activeConversationId ? `conversation-${activeConversationId}` : `user-${resolvedEmail?.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    
-    // Prepare sender info for the frontend
-    const isSenderAdmin = currentUser?.Role?.name === "Admin";
-    let senderName = message.User?.name || message.senderEmail || "Guest";
-    
-    if (message.Conversation) {
-      if (isSenderAdmin) {
-        senderName = message.Conversation.adminAlias || message.User?.name || "Admin";
-        senderName = `Admin - ${senderName}`;
-      } else {
-        senderName = message.Conversation.userAlias || message.User?.name || "User";
-      }
-    }
-
-    const pusherMessage = {
-      ...message,
-      sender: { name: senderName },
-      senderRole: isSenderAdmin ? "admin" : "user"
-    };
-
-    await pusherServer.trigger(channel, "new-message", pusherMessage);
-    
-    // Also notify some "global" channel for admin if they are on the conversation list
-    await pusherServer.trigger("admin-notifications", "conversation-updated", {
-      conversationId: activeConversationId,
-      lastMessage: pusherMessage
-    });
-  } catch (pusherError) {
-    console.error("Pusher Trigger Error:", pusherError);
-  }
-
-  await logActivity({
-    userId: resolvedSenderId,
-    action: "CHAT_MESSAGE_SENT",
-    description: normalizedContent,
-    route: "/dashboard/chat",
-    method: "SERVER_ACTION",
-    metadata: {
-      messageId: message.id,
-      conversationId: activeConversationId,
-      isAdmin: currentUser?.Role?.name === "Admin",
-    },
-  });
-
-  return { success: true, message };
-}
-export async function logout() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("portfolio_session")?.value;
-
-  if (userId) {
-    await logActivity({
-      userId,
-      action: "LOGOUT",
-      description: "Logout dari modul messaging.",
-      route: "/dashboard",
-      method: "SERVER_ACTION",
-    });
-  }
-
-  cookieStore.delete("portfolio_session");
-  return { success: true };
 }
