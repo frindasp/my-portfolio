@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Search as SearchIcon, X, Tag, Briefcase, FileText, Loader2, ArrowRight } from "lucide-react"
-import { searchClient } from "@/lib/algolia-client"
+import { searchClient, aa } from "@/lib/algolia-client"
 import Link from "next/link"
 import { useClickAway } from "react-use"
 
@@ -14,6 +14,7 @@ export function AlgoliaSearch() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<any[]>([])
+  const [queryID, setQueryID] = useState<string | undefined>()
   const [isLoading, setIsLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -54,10 +55,13 @@ export function AlgoliaSearch() {
               indexName: INDEX_NAME,
               query: query,
               hitsPerPage: 8,
+              clickAnalytics: true,
             },
           ],
         })
-        setResults((rawResults[0] as any).hits)
+        const res = rawResults[0] as any
+        setResults(res.hits)
+        setQueryID(res.queryID)
       } catch (error: any) {
         if (error.message?.includes("Index") && error.message?.includes("not exist")) {
           console.warn("Algolia index is not yet created. Please sync from the dashboard.")
@@ -122,11 +126,22 @@ export function AlgoliaSearch() {
                   <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     Search Results
                   </div>
-                  {results.map((hit) => (
+                  {results.map((hit, idx) => (
                     <Link
                       key={hit.objectID}
                       href={hit.url}
-                      onClick={() => setIsOpen(false)}
+                      onClick={() => {
+                        if (queryID) {
+                          aa("clickedObjectIDsAfterSearch", {
+                            index: INDEX_NAME,
+                            eventName: "Search Result Clicked",
+                            queryID: queryID,
+                            objectIDs: [hit.objectID],
+                            positions: [idx + 1],
+                          })
+                        }
+                        setIsOpen(false)
+                      }}
                       className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted transition-colors group"
                     >
                       <div className="mt-0.5 p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
