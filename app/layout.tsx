@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { HeaderIndex } from "@/components/layout/header";
 import { Toaster } from "@/components/ui/sonner";
 import { FloatingThemeToggle } from "@/components/ui/floating-theme-toggle";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 
 const geistSans = localFont({
@@ -43,12 +44,14 @@ export default function RootLayout({
         disableTransitionOnChange>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <HeaderIndex />
-          <main className="container mx-auto px-4 py-6 lg:px-24">
-            {children}
-          </main>
-          <FloatingThemeToggle />
-          <Toaster />
+          <QueryProvider>
+            <HeaderIndex />
+            <main className="container mx-auto px-4 py-6 lg:px-24">
+              {children}
+            </main>
+            <FloatingThemeToggle />
+            <Toaster />
+          </QueryProvider>
         </body>
       </ThemeProvider>
     </html>
