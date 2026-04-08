@@ -28,6 +28,11 @@ export const metadata: Metadata = {
   title: { template: "%s | taufaniafrinda", absolute: "taufaniafrinda" },
   // description: { template: "%s |", absolute: "taufaniafrinda" },
   description: "Taufania Frinda Personal Site",
+  verification: {
+    other: {
+      "algolia-site-verification": "51B5D1F7089DA45A",
+    },
+  },
 };
 
 export default function RootLayout({

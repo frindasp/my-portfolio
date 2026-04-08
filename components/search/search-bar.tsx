@@ -14,6 +14,7 @@ export function AlgoliaSearch() {
   const [results, setResults] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useClickAway(containerRef, () => {
     setIsOpen(false)
@@ -21,8 +22,9 @@ export function AlgoliaSearch() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
+        console.log("Search shortcut triggered")
         setIsOpen(true)
       }
       if (e.key === "Escape") {
@@ -32,6 +34,18 @@ export function AlgoliaSearch() {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      // Focus input when modal opens
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          console.log("Input focused")
+        }
+      }, 100)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!query.trim()) {
@@ -52,8 +66,14 @@ export function AlgoliaSearch() {
           ],
         })
         setResults((results[0] as any).hits)
-      } catch (error) {
-        console.error("Search error:", error)
+      } catch (error: any) {
+        // Handle "Index does not exist" error gracefully
+        if (error.message?.includes("Index") && error.message?.includes("not exist")) {
+          console.warn("Algolia index is not yet created. Please sync from the dashboard.")
+        } else {
+          console.error("Search error:", error)
+        }
+        setResults([])
       } finally {
         setIsLoading(false)
       }
@@ -84,7 +104,10 @@ export function AlgoliaSearch() {
             <div className="p-4 border-b flex items-center gap-3">
               <SearchIcon className="w-5 h-5 text-muted-foreground" />
               <input
+                ref={inputRef}
+                id="algolia-search-input"
                 autoFocus
+                autoComplete="off"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search projects, tags, or experience..."
