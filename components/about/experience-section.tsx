@@ -1,23 +1,33 @@
-"use client";
+"use client"
 
-import { MapPin, Calendar, Briefcase } from "lucide-react";
+import { MapPin, Calendar, Briefcase } from "lucide-react"
+import Link from "next/link"
+import type { Experience } from "@/lib/types"
 
-export interface Experience {
-  id: string;
-  role: string;
-  company: string;
-  type: string;
-  periodLabel: string;
-  location: string;
-  imageUrl: string | null;
-  description: unknown;
-  skills: unknown;
-  isActive: boolean;
-  order: number;
+function computePeriodLabel(startDate: string, endDate?: string | null): string {
+  if (!startDate) return ""
+  const start = new Date(startDate + "-01")
+  const end = endDate ? new Date(endDate + "-01") : new Date()
+  const months =
+    (end.getFullYear() - start.getFullYear()) * 12 +
+    (end.getMonth() - start.getMonth())
+  const years = Math.floor(months / 12)
+  const rem = months % 12
+  const duration =
+    years > 0 && rem > 0
+      ? `${years} thn ${rem} bln`
+      : years > 0
+      ? `${years} thn`
+      : `${rem} bln`
+  const startLabel = start.toLocaleDateString("id-ID", { month: "short", year: "numeric" })
+  const endLabel = endDate
+    ? end.toLocaleDateString("id-ID", { month: "short", year: "numeric" })
+    : "Saat ini"
+  return `${startLabel} – ${endLabel} · ${duration}`
 }
 
 interface ExperienceSectionProps {
-  experiences: Experience[];
+  experiences: Experience[]
 }
 
 export function ExperienceSection({ experiences }: ExperienceSectionProps) {
@@ -27,7 +37,7 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
         <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-40" />
         <p>No experiences found.</p>
       </section>
-    );
+    )
   }
 
   return (
@@ -39,25 +49,34 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
 
       <ol className="relative border-l border-border space-y-10 ml-3">
         {experiences.map((exp) => {
-          const skills = exp.skills as string[];
-          const description = exp.description as string[];
+          const description = exp.description as string[]
+          const skills = exp.Skill ?? []
+          const images = exp.ExperienceImage ?? []
+          const firstImage = images[0]
 
           return (
-            <li key={exp.id} className="pl-8 relative">
+            <li key={exp.id} className="pl-8 relative group">
               {/* Timeline dot */}
-              <span className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-border bg-background" />
+              <span className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-border bg-background transition-colors group-hover:border-primary" />
 
               {/* Company image if available */}
-              {exp.imageUrl && (
+              {firstImage && (
                 <img
-                  src={exp.imageUrl}
+                  src={firstImage.url}
                   alt={exp.company}
                   className="w-10 h-10 rounded object-cover border border-border mb-2"
                 />
               )}
 
-              {/* Role & Company */}
-              <p className="font-semibold text-base leading-snug">{exp.role}</p>
+              {/* Role & Company — clickable to detail */}
+              <Link
+                href={`/experience/${exp.id}`}
+                className="group/link inline-block"
+              >
+                <p className="font-semibold text-base leading-snug group-hover/link:text-primary transition-colors">
+                  {exp.role}
+                </p>
+              </Link>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {exp.company}
                 <span className="mx-1.5">·</span>
@@ -68,7 +87,7 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
-                  {exp.periodLabel}
+                  {computePeriodLabel(exp.startDate, exp.endDate)}
                 </span>
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" />
@@ -86,20 +105,22 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
               )}
 
               {/* Skill tags */}
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="px-2 py-0.5 rounded-full text-xs border border-border bg-muted text-muted-foreground"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+              {skills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {skills.map((skill: { id: string; name: string }) => (
+                    <span
+                      key={skill.id}
+                      className="px-2 py-0.5 rounded-full text-xs border border-border bg-muted text-muted-foreground"
+                    >
+                      {skill.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </li>
-          );
+          )
         })}
       </ol>
     </section>
-  );
+  )
 }

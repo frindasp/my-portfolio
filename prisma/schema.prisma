@@ -168,20 +168,55 @@ model About {
 }
 
 model Experience {
-  id          String   @id @default(cuid())
-  company     String
-  role        String
-  type        String
-  startDate   String
-  endDate     String?
-  periodLabel String
-  location    String
-  skills      Json
-  description Json
-  imageUrl    String?
-  imageFileId String?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String            @id @default(cuid())
+  company         String
+  role            String
+  type            String
+  startDate       String
+  endDate         String?
+  location        String
+  description     Json
+  order           Int               @default(0)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ExperienceImage ExperienceImage[]
+  Portfolio       Portfolio[]
+  Skill           Skill[]           @relation("ExperienceToSkill")
+}
+
+model Skill {
+  id         String       @id
+  name       String       @unique
+  createdAt  DateTime     @default(now())
+  Experience Experience[] @relation("ExperienceToSkill")
+}
+
+model ExperienceImage {
+  id           String     @id
+  url          String
+  fileId       String
+  caption      String?
+  order        Int        @default(0)
+  experienceId String
+  createdAt    DateTime   @default(now())
+  Experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId])
+}
+
+model Portfolio {
+  id           String      @id
+  title        String
+  description  String?     @db.Text
+  images       Json
+  tags         Json
+  experienceId String?
+  order        Int         @default(0)
+  isPublished  Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime
+  Experience   Experience? @relation(fields: [experienceId], references: [id])
+
+  @@index([experienceId])
 }

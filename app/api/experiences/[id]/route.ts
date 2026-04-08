@@ -1,0 +1,31 @@
+import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  try {
+    const experience = await prisma.experience.findUnique({
+      where: { id, isActive: true },
+      include: {
+        Skill: { orderBy: { name: "asc" } },
+        ExperienceImage: { orderBy: { order: "asc" } },
+        Portfolio: {
+          where: { isPublished: true },
+          orderBy: { order: "asc" },
+        },
+      },
+    })
+    if (!experience) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+    return NextResponse.json(experience)
+  } catch (error) {
+    console.error("Failed to fetch experience:", error)
+    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 })
+  }
+}

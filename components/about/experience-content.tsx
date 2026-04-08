@@ -1,18 +1,14 @@
-"use client";
+"use client"
 
-import { useQuery } from "@tanstack/react-query";
-import { ExperienceSection, type Experience } from "./experience-section";
-import { Skeleton } from "@/components/ui/skeleton";
-
-interface AboutData {
-  about: unknown;
-  experiences: Experience[];
-}
+import { useQuery } from "@tanstack/react-query"
+import { ExperienceSection } from "./experience-section"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { AboutData } from "@/lib/types"
 
 async function fetchAboutData(): Promise<AboutData> {
-  const res = await fetch("/api/about");
-  if (!res.ok) throw new Error("Failed to fetch experience data");
-  return res.json();
+  const res = await fetch("/api/about")
+  if (!res.ok) throw new Error("Failed to fetch experience data")
+  return res.json()
 }
 
 export function ExperienceContent() {
@@ -20,9 +16,9 @@ export function ExperienceContent() {
     queryKey: ["about"],
     queryFn: fetchAboutData,
     staleTime: 60 * 1000,
-  });
+  })
 
-  const experiences = data?.experiences ?? [];
+  const experiences = data?.experiences ?? []
 
   if (isLoading) {
     return (
@@ -44,7 +40,7 @@ export function ExperienceContent() {
           </div>
         ))}
       </div>
-    );
+    )
   }
 
   if (isError) {
@@ -52,12 +48,12 @@ export function ExperienceContent() {
       <div className="max-w-3xl mx-auto py-16 text-center text-muted-foreground">
         <p className="text-sm">Failed to load experiences. Please try again.</p>
       </div>
-    );
+    )
   }
 
   return (
     <div className="max-w-3xl mx-auto py-8">
       <ExperienceSection experiences={experiences} />
     </div>
-  );
+  )
 }
