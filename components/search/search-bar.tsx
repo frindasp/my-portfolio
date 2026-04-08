@@ -6,6 +6,8 @@ import { searchClient } from "@/lib/algolia-client"
 import Link from "next/link"
 import { useClickAway } from "react-use"
 
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+
 const INDEX_NAME = "portfolio_search"
 
 export function AlgoliaSearch() {
@@ -13,18 +15,12 @@ export function AlgoliaSearch() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  useClickAway(containerRef, () => {
-    setIsOpen(false)
-  })
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
-        console.log("Search shortcut triggered")
         setIsOpen(true)
       }
       if (e.key === "Escape") {
@@ -37,12 +33,8 @@ export function AlgoliaSearch() {
 
   useEffect(() => {
     if (isOpen) {
-      // Focus input when modal opens
       setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus()
-          console.log("Input focused")
-        }
+        inputRef.current?.focus()
       }, 100)
     }
   }, [isOpen])
@@ -56,7 +48,7 @@ export function AlgoliaSearch() {
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const { results } = await searchClient.search({
+        const { results: rawResults } = await searchClient.search({
           requests: [
             {
               indexName: INDEX_NAME,
@@ -65,9 +57,8 @@ export function AlgoliaSearch() {
             },
           ],
         })
-        setResults((results[0] as any).hits)
+        setResults((rawResults[0] as any).hits)
       } catch (error: any) {
-        // Handle "Index does not exist" error gracefully
         if (error.message?.includes("Index") && error.message?.includes("not exist")) {
           console.warn("Algolia index is not yet created. Please sync from the dashboard.")
         } else {
@@ -95,12 +86,9 @@ export function AlgoliaSearch() {
         </kbd>
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex justify-center pt-[15vh] px-4">
-          <div 
-            ref={containerRef}
-            className="w-full max-w-xl bg-card border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200"
-          >
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="p-0 overflow-hidden max-w-xl border-none shadow-2xl top-[20%] translate-y-0">
+          <div className="flex flex-col bg-card">
             <div className="p-4 border-b flex items-center gap-3">
               <SearchIcon className="w-5 h-5 text-muted-foreground" />
               <input
@@ -113,12 +101,9 @@ export function AlgoliaSearch() {
                 placeholder="Search projects, tags, or experience..."
                 className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-muted-foreground"
               />
-              <button onClick={() => setIsOpen(false)}>
-                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto max-h-[60vh]">
+            <div className="flex-1 overflow-y-auto max-h-[60vh] min-h-[120px]">
               {isLoading && (
                 <div className="p-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="w-8 h-8 animate-spin" />
@@ -181,20 +166,10 @@ export function AlgoliaSearch() {
               )}
 
               {!query && (
-                <div className="p-8 text-center text-muted-foreground">
-                  <SearchIcon className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+                  <SearchIcon className="w-12 h-12 mx-auto mb-4 opacity-10" />
                   <p className="text-sm">Search by title, description, tags, company or role...</p>
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    {["React", "Interior", "Design", "Product"].map(t => (
-                      <button 
-                        key={t}
-                        onClick={() => setQuery(t)}
-                        className="text-[10px] bg-muted px-2 py-1 rounded-full hover:bg-primary/20 transition-colors"
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-xs mt-2 opacity-60 italic">Find architectural designs, tech stacks, or career journey</p>
                 </div>
               )}
             </div>
@@ -211,8 +186,8 @@ export function AlgoliaSearch() {
               <div className="font-semibold italic">Search powered by Algolia</div>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
