@@ -49,6 +49,8 @@ function LoginForm() {
   const { setActiveTab } = useProfileStore();
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
 
+  const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
+
   useEffect(() => {
     const emailParam = searchParams?.get("email");
     if (emailParam) setEmail(emailParam);
@@ -81,7 +83,7 @@ function LoginForm() {
              setShowMfaPrompt(true);
            } else {
              toast.success("Welcome back!");
-             router.push("/dashboard");
+             router.push(callbackUrl);
              router.refresh();
            }
         }
@@ -116,7 +118,7 @@ function LoginForm() {
       const verificationResult = await verifyAuthenticationAction(assertionRes);
       if (verificationResult.success) {
         toast.success("Authenticated successfully!");
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
       } else {
         toast.error(verificationResult.error);
@@ -173,7 +175,7 @@ function LoginForm() {
       const res = await verifyOTPAndLogin(email, otp, isNewUserFromContact ? password : undefined);
       if (res.success) {
         toast.success("Verified successfully!");
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
       } else {
         toast.error(res.error || "Invalid OTP");
@@ -193,7 +195,7 @@ function LoginForm() {
       const res = await verifyTOTPCode(totp2faUserId, otp);
       if (res.success) {
         toast.success("Verified successfully!");
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
       } else {
         toast.error(res.error || "Invalid authenticator code");
@@ -308,7 +310,7 @@ function LoginForm() {
 
       setShowMfaPrompt(false);
       toast.success("Welcome back!");
-      router.push("/dashboard");
+      router.push(callbackUrl);
       router.refresh();
     } catch (error) {
       toast.error("Failed to skip MFA reminder");

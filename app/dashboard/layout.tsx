@@ -42,8 +42,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const checkAuth = async () => {
       const user = await getCurrentUser();
       if (!user) {
+        await logout();
         toast.error("Please login to access the dashboard");
-        router.push("/login");
+        router.push(`/login?callbackUrl=${encodeURIComponent(pathname || "")}`);
         return;
       }
       setCurrentUser(user);
