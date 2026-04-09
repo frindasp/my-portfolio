@@ -27,8 +27,12 @@ interface MessagingState {
   hasCheckedEmail: boolean;
   unreadCount: number;
   guestSessionId: string | null;
+  isAnonymous: boolean;
+  messageCount: number;
   toggleOpen: () => void;
   setUser: (user: { id: string; name: string | null; email: string }) => void;
+  setAnonymousUser: (userId: string) => void;
+  incrementMessageCount: () => void;
   setMessages: (messages: Message[]) => void;
   setConversations: (conversations: ConversationWithLastMessage[]) => void;
   setActiveConv: (convId: string | null) => void;
@@ -53,14 +57,23 @@ export const useMessagingStore = create<MessagingState>()(
       hasCheckedEmail: false,
       unreadCount: 0,
       guestSessionId: null,
+      isAnonymous: false,
+      messageCount: 0,
       toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
       setUser: (user) => set({ 
         userId: user.id, 
         userName: user.name, 
         userEmail: user.email, 
         isRegistered: true,
-        hasCheckedEmail: true
+        hasCheckedEmail: true,
+        isAnonymous: false
       }),
+      setAnonymousUser: (userId) => set({
+        userId,
+        isAnonymous: true,
+        isRegistered: false
+      }),
+      incrementMessageCount: () => set((state) => ({ messageCount: state.messageCount + 1 })),
       setMessages: (messages) => set({ messages }),
       setConversations: (conversations) => set({ conversations }),
       setActiveConv: (activeConvId) => set({ activeConvId }),
@@ -81,7 +94,9 @@ export const useMessagingStore = create<MessagingState>()(
         activeConvId: null,
         messages: [],
         unreadCount: 0,
-        guestSessionId: null
+        guestSessionId: null,
+        isAnonymous: false,
+        messageCount: 0
       }),
     }),
     {

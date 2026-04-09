@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { checkEmailStatus, sendVerificationOTP, verifyOTPAndLogin } from "@/app/actions/messaging";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import { ShieldCheck, Loader2, ArrowRight } from "lucide-react";
 import { useMessagingStore } from "@/store/use-messaging-store";
+import { useRouter } from "next/navigation";
 
 export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
   const [step, setStep] = useState<"email" | "otp" | "password">("email");
@@ -20,6 +21,8 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
   
   const setUser = useMessagingStore((state) => state.setUser);
   const setStoreEmail = useMessagingStore((state) => state.setEmail);
+  const { userId, isAnonymous } = useMessagingStore();
+  const router = useRouter();
 
   const handleEmailCheck = async () => {
     if (!email || !email.includes("@")) {
@@ -61,7 +64,7 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
 
     setLoading(true);
     try {
-      const result = await verifyOTPAndLogin(email, otp);
+      const result = await verifyOTPAndLogin(email, otp, undefined, undefined, isAnonymous ? (userId || undefined) : undefined);
       if (result.success && result.user) {
         if (!isRegistered) {
           // If not registered, we need a password
@@ -70,6 +73,7 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
           // If already registered, we're done (logged in)
           setUser({ id: result.user.id, email: result.user.email, name: result.user.name });
           toast.success("Welcome back!");
+          router.push("/dashboard/chat");
         }
       } else {
         toast.error(result.error || "Invalid code");
@@ -91,10 +95,11 @@ export default function AuthOverlay({ onCancel }: { onCancel?: () => void }) {
     try {
       // Re-verify code is still valid (or just use the session state)
       // Actually verifyOTPAndLogin already handles it
-      const result = await verifyOTPAndLogin(email, otp, password, name);
+      const result = await verifyOTPAndLogin(email, otp, password, name, isAnonymous ? (userId || undefined) : undefined);
       if (result.success && result.user) {
         setUser({ id: result.user.id, email: result.user.email, name: result.user.name });
         toast.success("Registration successful! You can now chat.");
+        router.push("/dashboard/chat");
       } else {
         toast.error(result.error || "Registration failed");
       }

@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import ChatWindow from "./ChatWindow";
 import { useMessagingStore } from "@/store/use-messaging-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
 
 export function FloatingLiveChat() {
   const { isOpen, toggleOpen, setGuestSessionId, guestSessionId, isRegistered, userEmail } = useMessagingStore();
   const [showDialog, setShowDialog] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!isRegistered && !guestSessionId) {
@@ -22,7 +24,7 @@ export function FloatingLiveChat() {
 
   const handleOpenClick = () => {
     if (isRegistered) {
-      toggleOpen();
+      router.push("/dashboard/chat");
     } else {
       setShowDialog(true);
     }

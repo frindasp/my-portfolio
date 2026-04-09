@@ -38,8 +38,30 @@ export async function checkEmailStatus(email: string) {
   return {
     hasContacted: false,
     lastContactName: null,
-    isRegistered: !!registeredUser,
+    isRegistered: !!registeredUser && !registeredUser.name?.startsWith("anonymous-"),
   };
+}
+
+/**
+ * Create an anonymous user
+ */
+export async function createAnonymousUser() {
+  try {
+    const userRole = await getOrCreateRole("User");
+    const anonymousId = Math.random().toString(36).substring(2, 8);
+    const user = await prisma.user.create({
+      data: {
+        name: `anonymous-${anonymousId}`,
+        email: `anonymous-${anonymousId}@guest.com`,
+        password: await bcrypt.hash(Math.random().toString(36), 10),
+        roleId: userRole.id,
+      },
+    });
+    return { success: true, userId: user.id };
+  } catch (error) {
+    console.error("createAnonymousUser error:", error);
+    return { success: false, error: "Failed to create anonymous user" };
+  }
 }
 
 /**
@@ -172,6 +194,7 @@ export async function verifyOTPAndLogin(
   token: string,
   password?: string,
   name?: string,
+  anonymousUserId?: string,
 ) {
   const verification = await prisma.verificationToken.findUnique({
     where: { email_token: { email, token } },
@@ -192,23 +215,38 @@ export async function verifyOTPAndLogin(
   let user;
   if (password) {
     const hashedPassword = await bcrypt.hash(password, 10);
-    user = await prisma.user.upsert({
-      where: {
-        email_roleId: { email, roleId: userRole.id },
-      },
-      update: {
-        password: hashedPassword,
-        name: name || undefined,
-      },
-      create: {
-        email,
-        password: hashedPassword,
-        roleId: userRole.id,
-        name: name || null,
-        updatedAt: new Date(),
-      },
-      include: { Role: true },
-    });
+    
+    // If we have an anonymous user, update them
+    if (anonymousUserId) {
+      user = await prisma.user.update({
+        where: { id: anonymousUserId },
+        data: {
+          email,
+          password: hashedPassword,
+          name: name || undefined,
+          updatedAt: new Date(),
+        },
+        include: { Role: true },
+      });
+    } else {
+      user = await prisma.user.upsert({
+        where: {
+          email_roleId: { email, roleId: userRole.id },
+        },
+        update: {
+          password: hashedPassword,
+          name: name || undefined,
+        },
+        create: {
+          email,
+          password: hashedPassword,
+          roleId: userRole.id,
+          name: name || null,
+          updatedAt: new Date(),
+        },
+        include: { Role: true },
+      });
+    }
   } else {
     // Just find existing user
     user = await prisma.user.findUnique({

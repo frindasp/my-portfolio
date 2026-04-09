@@ -47,6 +47,7 @@ import {
   toggleConversationFavoriteStatus,
   toggleConversationArchivedStatus,
   toggleConversationMutedStatus,
+  createAnonymousUser,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import AuthOverlay from "./AuthOverlay";
@@ -61,7 +62,8 @@ export default function ChatWindow(): React.ReactElement | null {
     messages, setMessages, addMessage, 
     conversations, setConversations, 
     activeConvId, setActiveConv,
-    userId, userEmail, isRegistered, userName, guestSessionId
+    userId, userEmail, isRegistered, userName, guestSessionId,
+    isAnonymous, messageCount, setAnonymousUser, incrementMessageCount
   } = useMessagingStore();
   
   const [userNickname, setUserNickname] = useState("");
@@ -189,20 +191,68 @@ export default function ChatWindow(): React.ReactElement | null {
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (!isRegistered && messageCount >= 3) {
+      setShowAuth(true);
+    }
+  }, [isRegistered, messageCount]);
+
   const handleSendMessage = async () => {
-    if (!content.trim() || sending || !activeConvId) return;
+    if (!content.trim() || sending) return;
+
+    // Limit check for anonymous users
+    if (!isRegistered && messageCount >= 3) {
+      setShowAuth(true);
+      return;
+    }
 
     setSending(true);
     try {
-      const emailToUse = userEmail || `${guestSessionId}@guest.com`;
-      const idToUse = userId || undefined; 
-      const result = await sendChatMessage(content, emailToUse, idToUse, activeConvId);
+      let currentUserId = userId;
+      let emailToUse = userEmail;
+
+      // Create anonymous user if not registered and no userId
+      if (!isRegistered && !currentUserId) {
+        const res = await createAnonymousUser();
+        if (res.success && res.userId) {
+          setAnonymousUser(res.userId);
+          currentUserId = res.userId;
+        } else {
+          toast.error("Failed to start session");
+          setSending(false);
+          return;
+        }
+      }
+
+      // If no active conversation, we need to create or find one
+      let actualConvId = activeConvId;
+      if (!actualConvId) {
+        // Find existing conversation for this user if any
+         const loadedConversations = await getConversations(emailToUse || undefined, currentUserId || undefined);
+         if (loadedConversations.length > 0) {
+           actualConvId = loadedConversations[0].id;
+           setActiveConv(actualConvId);
+         }
+      }
+
+      const result = await sendChatMessage(content, emailToUse || undefined, currentUserId || undefined, actualConvId || undefined);
+      
       if (result.success && result.message) {
         setContent("");
+        incrementMessageCount();
+        
+        // If it was a new conversation, set it as active
+        if (!actualConvId && result.message.conversationId) {
+          setActiveConv(result.message.conversationId);
+          // Refresh conversations
+          const email = userEmail || (guestSessionId ? `${guestSessionId}@guest.com` : undefined);
+          getConversations(email, currentUserId || undefined).then(setConversations);
+        }
       } else {
         toast.error("Failed to send message");
       }
     } catch (error) {
+      console.error("Chat error:", error);
       toast.error("An error occurred");
     } finally {
       setSending(false);
@@ -303,7 +353,7 @@ export default function ChatWindow(): React.ReactElement | null {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  if (showAuth && !isRegistered) {
+  if (showAuth && (!isRegistered || (isAnonymous && messageCount >= 3))) {
     return (
       <div className="relative h-full">
         <AuthOverlay onCancel={() => setShowAuth(false)} />
@@ -537,13 +587,13 @@ export default function ChatWindow(): React.ReactElement | null {
             onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
             placeholder="Ketik pesan..."
             className="flex-1 pr-12 rounded-2xl bg-background border-primary/20 focus-visible:ring-primary/20 h-11 text-sm shadow-inner"
-            disabled={sending}
+            disabled={sending || (!isRegistered && messageCount >= 3)}
           />
           <Button 
             size="icon" 
             variant="ghost" 
             onClick={handleSendMessage}
-            disabled={sending || !content.trim()}
+            disabled={sending || !content.trim() || (!isRegistered && messageCount >= 3)}
             className="absolute right-1 h-9 w-9 rounded-xl text-primary hover:text-primary hover:bg-primary/10 active:scale-95 transition-all"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
