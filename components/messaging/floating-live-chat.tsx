@@ -7,23 +7,43 @@ import ChatWindow from "./ChatWindow";
 import { useMessagingStore } from "@/store/use-messaging-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/app/actions/messaging";
 
 export function FloatingLiveChat() {
-  const { isOpen, toggleOpen, setGuestSessionId, guestSessionId, isRegistered, userEmail } = useMessagingStore();
+  const { 
+    isOpen, 
+    toggleOpen, 
+    setGuestSessionId, 
+    guestSessionId, 
+    isRegistered, 
+    setUser
+  } = useMessagingStore();
   const [showDialog, setShowDialog] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    // Sync actual auth state if not already marked as registered
+    if (!isRegistered) {
+      getCurrentUser().then(user => {
+        if (user) {
+          setUser({ id: user.id, name: user.name, email: user.email });
+        }
+      });
+    }
+
     if (!isRegistered && !guestSessionId) {
       const newGuestId = "guest-" + Date.now();
       setGuestSessionId(newGuestId);
-      // We do NOT set email here automatically so it doesn't break other things, 
-      // but if we want to use guest email for queries we can.
     }
-  }, [isRegistered, guestSessionId, setGuestSessionId]);
+  }, [isRegistered, guestSessionId, setGuestSessionId, setUser]);
 
-  const handleOpenClick = () => {
-    if (isRegistered) {
+  const handleOpenClick = async () => {
+    // Double check auth state just in case
+    const user = await getCurrentUser();
+    if (user || isRegistered) {
+      if (user && !isRegistered) {
+        setUser({ id: user.id, name: user.name, email: user.email });
+      }
       router.push("/dashboard/chat");
     } else {
       setShowDialog(true);

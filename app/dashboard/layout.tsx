@@ -13,7 +13,8 @@ import {
   Zap,
   ShieldCheck,
   ChevronRight,
-  History
+  History,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout, getCurrentUser, getUnreadConversationCounts } from "@/app/actions/messaging";
@@ -27,6 +28,7 @@ const sidebarItems = [
   { name: "Verification Codes", href: "/dashboard/otp", icon: ShieldCheck, adminOnly: true },
   { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
   { name: "Profile", href: "/dashboard/profile", icon: User },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
   { name: "History", href: "/dashboard/history", icon: History },
 ];
 
@@ -180,9 +182,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         "fixed inset-y-0 left-0 z-50 w-72 bg-card border-r shadow-2xl transition-transform duration-300 md:hidden",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6 flex items-center justify-between">
-          <span className="text-xl font-bold">Menu</span>
-          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)}>
+        <div className="p-6 flex items-center justify-between border-b">
+          <div className="flex items-center gap-3">
+             <Button 
+               variant="ghost" 
+               size="sm"
+               onClick={handleLogout}
+               className="h-10 px-3 rounded-xl text-red-500 hover:bg-red-500/10 hover:text-red-500 text-xs font-bold"
+             >
+               <LogOut className="h-4 w-4 mr-2" />
+               Logout
+             </Button>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="rounded-xl">
             <X className="h-6 w-6" />
           </Button>
         </div>
