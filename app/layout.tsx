@@ -56,7 +56,7 @@ export default function RootLayout({
             </main>
             <FloatingLiveChat />
             <FloatingThemeToggle />
-            <Toaster />
+            <Toaster position="bottom-left" />
           </QueryProvider>
         </body>
       </ThemeProvider>
