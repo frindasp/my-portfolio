@@ -15,6 +15,7 @@ export const useTranslation = () => {
   // Shortcuts for commonly used translation blocks
   const t_display = t.settings.display;
   const t_lang = t.settings.language;
+  const t_chat = t.chat;
 
-  return { lang, setLang, t, t_display, t_lang };
+  return { lang, setLang, t, t_display, t_lang, t_chat };
 };
