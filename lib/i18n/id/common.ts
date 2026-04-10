@@ -18,4 +18,9 @@ export const common = {
       description: "Tampilan sistem diubah ke",
     },
   },
+  dock: {
+    theme: "Tema",
+    language: "Bahasa",
+    chat: "Chat Langsung",
+  },
 };

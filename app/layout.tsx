@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { HeaderIndex } from "@/components/layout/header";
 import { Toaster } from "@/components/ui/sonner";
 import { FloatingLiveChat } from "@/components/messaging/floating-live-chat";
-import { FloatingThemeToggle } from "@/components/ui/floating-theme-toggle";
+import { ActionDock } from "@/components/layout/action-dock";
 import { QueryProvider } from "@/components/providers/query-provider";
 
 const geistSans = localFont({
@@ -55,7 +55,7 @@ export default function RootLayout({
               {children}
             </main>
             <FloatingLiveChat />
-            <FloatingThemeToggle />
+            <ActionDock />
             <Toaster position="bottom-left" />
           </QueryProvider>
         </body>

@@ -18,4 +18,9 @@ export const common = {
       description: "Switched interface theme to",
     },
   },
+  dock: {
+    theme: "Theme",
+    language: "Language",
+    chat: "Live Chat",
+  },
 };

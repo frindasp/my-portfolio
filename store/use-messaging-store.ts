@@ -41,6 +41,8 @@ interface MessagingState {
   setUnreadCount: (count: number) => void;
   setGuestSessionId: (id: string) => void;
   clearSession: () => void;
+  isGuestDialogOpen: boolean;
+  setGuestDialogOpen: (open: boolean) => void;
 }
 
 export const useMessagingStore = create<MessagingState>()(
@@ -59,6 +61,7 @@ export const useMessagingStore = create<MessagingState>()(
       guestSessionId: null,
       isAnonymous: false,
       messageCount: 0,
+      isGuestDialogOpen: false,
       toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
       setUser: (user) => set({ 
         userId: user.id, 
@@ -84,6 +87,7 @@ export const useMessagingStore = create<MessagingState>()(
       setEmail: (email) => set({ userEmail: email, hasCheckedEmail: true }),
       setUnreadCount: (unreadCount) => set({ unreadCount }),
       setGuestSessionId: (id) => set({ guestSessionId: id }),
+      setGuestDialogOpen: (isGuestDialogOpen) => set({ isGuestDialogOpen }),
       clearSession: () => set({ 
         userEmail: null, 
         userId: null, 
@@ -96,16 +100,13 @@ export const useMessagingStore = create<MessagingState>()(
         unreadCount: 0,
         guestSessionId: null,
         isAnonymous: false,
-        messageCount: 0
+        messageCount: 0,
+        isGuestDialogOpen: false
       }),
     }),
     {
       name: 'messaging-storage',
       storage: createJSONStorage(() => localStorage),
-      // We don't need to persist messages and conversations to localstorage if they are fetched from server,
-      // but the prompt says: "di sisi user hanya akan disimpan di localstorage menggunakan state managa=ement zustand di sisi user".
-      // Usually, it's better to persist 'guestSessionId', 'activeConvId', 'conversations', 'messages'.
-      // If we persist everything, the state is correctly restored for anonymous users.
     }
   )
 );
