@@ -36,6 +36,8 @@ model User {
   updatedAt           DateTime              @updatedAt
   twoFactorEnabled    Boolean               @default(false)
   mfaDismissedAt      DateTime?
+  isOnline            Boolean               @default(false)
+  lastSeen            DateTime              @default(now())
   authenticators      Authenticator[]
   HistoryActivityUser HistoryActivityUser[]
   Messages            Message[]
@@ -85,6 +87,7 @@ model Message {
   senderEmail    String?
   conversationId String?
   isRead         Boolean       @default(false)
+  status         MessageStatus @default(SENT)
 
   Conversation   Conversation? @relation(fields: [conversationId], references: [id])
   User           User?         @relation(fields: [senderId], references: [id])
@@ -239,4 +242,10 @@ model Tag {
   name      String      @unique
   createdAt DateTime    @default(now())
   Portfolio Portfolio[]
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
 }

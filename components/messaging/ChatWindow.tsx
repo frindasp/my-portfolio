@@ -23,6 +23,8 @@ import {
   Bell,
   StarOff,
   ArchiveRestore,
+  Check,
+  CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +50,9 @@ import {
   toggleConversationArchivedStatus,
   toggleConversationMutedStatus,
   createAnonymousUser,
+  markMessageStatus,
+  notifyTyping,
+  updateUserStatus,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import AuthOverlay from "./AuthOverlay";
@@ -80,6 +85,9 @@ export default function ChatWindow(): React.ReactElement | null {
   const [filterTab, setFilterTab] = useState("all"); 
   const baseTitleRef = useRef<string>("Coretan");
   
+  const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, { isOnline: boolean; lastSeen: string }>>({});
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -156,8 +164,21 @@ export default function ChatWindow(): React.ReactElement | null {
       }
     });
 
+    const statusChannel = pusherClient.subscribe("user-status");
+    statusChannel.bind("status-changed", (data: { userId: string; isOnline: boolean; lastSeen: string }) => {
+      setOnlineUsers(prev => ({
+        ...prev,
+        [data.userId]: { isOnline: data.isOnline, lastSeen: data.lastSeen }
+      }));
+    });
+
+    // Notify online
+    updateUserStatus(true);
+
     return () => {
       pusherClient.unsubscribe("admin-notifications");
+      pusherClient.unsubscribe("user-status");
+      updateUserStatus(false);
     };
   }, [activeConvId, setConversations, conversations]);
 
@@ -178,12 +199,40 @@ export default function ChatWindow(): React.ReactElement | null {
     
     channel.bind("new-message", (data: any) => {
       addMessage(data);
+      // Mark as delivered if we are the recipient
+      if (data.senderId !== userId && data.isAdmin) {
+        markMessageStatus(data.id, "DELIVERED");
+      }
+    });
+
+    channel.bind("user-typing", (data: { userId: string; userName: string; conversationId: string }) => {
+      if (data.userId === userId) return;
+      setTypingUsers(prev => {
+        const current = prev[data.conversationId] || [];
+        if (current.includes(data.userName)) return prev;
+        return { ...prev, [data.conversationId]: [...current, data.userName] };
+      });
+    });
+
+    channel.bind("user-stop-typing", (data: { userId: string; userName: string; conversationId: string }) => {
+      setTypingUsers(prev => {
+        const current = prev[data.conversationId] || [];
+        return { ...prev, [data.conversationId]: current.filter(n => n !== data.userName) };
+      });
+    });
+
+    channel.bind("message-status-updated", (data: { messageId: string; status: "SENT" | "DELIVERED" | "READ" }) => {
+      setMessages(messages.map(m => m.id === data.messageId ? { ...m, status: data.status } : m));
+    });
+
+    channel.bind("conversation-status-updated", (data: { conversationId: string; status: "SENT" | "DELIVERED" | "READ" }) => {
+      setMessages(messages.map(m => m.status !== "READ" ? { ...m, status: data.status } : m));
     });
 
     return () => {
       pusherClient.unsubscribe(channelName);
     };
-  }, [activeConvId, setMessages, addMessage]);
+  }, [activeConvId, setMessages, addMessage, userId, messages]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -257,6 +306,17 @@ export default function ChatWindow(): React.ReactElement | null {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleInputChange = (val: string) => {
+    setContent(val);
+    if (!activeConvId) return;
+    
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    notifyTyping(activeConvId, true);
+    typingTimeoutRef.current = setTimeout(() => {
+      notifyTyping(activeConvId, false);
+    }, 3000);
   };
 
   const handleCreateConversation = async () => {
@@ -429,7 +489,11 @@ export default function ChatWindow(): React.ReactElement | null {
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                        <p className="text-[10px] text-muted-foreground truncate flex-1 opacity-70">
-                          {c.userAlias ? `[${c.userAlias}] ` : ""}{c.Message?.[0]?.content || "..."}
+                          {typingUsers[c.id]?.length > 0 ? (
+                            <span className="text-primary animate-pulse italic font-bold">Sedang mengetik...</span>
+                          ) : (
+                            <>{c.userAlias ? `[${c.userAlias}] ` : ""}{c.Message?.[0]?.content || "..."}</>
+                          )}
                        </p>
                        {unreadCounts[c.id] !== undefined && (
                          <span className={cn("flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[8px] font-black h-3.5 min-w-[14px] px-0.5", unreadCounts[c.id] === -1 && "h-1.5 w-1.5 p-0")}>
@@ -565,9 +629,22 @@ export default function ChatWindow(): React.ReactElement | null {
               )}
             >
               <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-              <span className="mt-1.5 text-[9px] opacity-50 self-end font-mono">
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+              <div className="flex items-center gap-1 self-end">
+                <span className="mt-1.5 text-[9px] opacity-50 font-mono">
+                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {!msg.isAdmin && (
+                  <span className="flex items-center mt-1.5 opacity-50">
+                    {msg.status === "READ" ? (
+                      <CheckCheck className="h-3 w-3 text-blue-400" />
+                    ) : msg.status === "DELIVERED" ? (
+                      <CheckCheck className="h-3 w-3" />
+                    ) : (
+                      <Check className="h-3 w-3" />
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           ))
         )}
@@ -583,7 +660,7 @@ export default function ChatWindow(): React.ReactElement | null {
         <div className="relative flex items-center gap-2">
           <Input 
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
             placeholder="Ketik pesan..."
             className="flex-1 pr-12 rounded-2xl bg-background border-primary/20 focus-visible:ring-primary/20 h-11 text-sm shadow-inner"

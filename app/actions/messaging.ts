@@ -484,6 +484,7 @@ export async function sendChatMessage(
         senderId: userId || null,
         conversationId: finalConvId || null,
         isAdmin: false,
+        status: 'SENT',
       },
       include: {
         User: { select: { name: true, email: true } },
@@ -660,6 +661,22 @@ export async function markConversationAsRead(conversationId: string, userId?: st
     }
   });
 
+  // Also update all admin messages in this conversation to READ
+  await prisma.message.updateMany({
+    where: { 
+      conversationId, 
+      isAdmin: true, // User marks Admin messages as read
+      status: { not: 'READ' } 
+    },
+    data: { status: 'READ', isRead: true }
+  });
+
+  // Trigger Pusher notification for the admin
+  await pusherServer.trigger(`conversation-${conversationId}`, "conversation-status-updated", {
+    conversationId,
+    status: "READ",
+  });
+
   return { success: true };
 }
 
@@ -750,6 +767,66 @@ export async function deleteConversation(conversationId: string) {
     await prisma.conversation.delete({
       where: { id: conversationId }
     });
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
+export async function markMessageStatus(messageId: string, status: 'DELIVERED' | 'READ') {
+  try {
+    const message = await prisma.message.update({
+      where: { id: messageId },
+      data: { 
+        status,
+        isRead: status === 'READ' ? true : undefined
+      }
+    });
+
+    await pusherServer.trigger(`conversation-${message.conversationId}`, "message-status-updated", {
+      messageId: message.id,
+      status,
+      conversationId: message.conversationId,
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
+export async function notifyTyping(conversationId: string, isTyping: boolean) {
+  try {
+    const user = await getCurrentUser();
+    const event = isTyping ? "user-typing" : "user-stop-typing";
+    await pusherServer.trigger(`conversation-${conversationId}`, event, {
+      userId: user?.id || "GUEST",
+      userName: user?.name || "Guest",
+      conversationId,
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
+export async function updateUserStatus(isOnline: boolean) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false };
+
+    const lastSeen = new Date();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { isOnline, lastSeen }
+    });
+
+    await pusherServer.trigger("user-status", "status-changed", {
+      userId: user.id,
+      isOnline,
+      lastSeen: lastSeen.toISOString(),
+    });
+
     return { success: true };
   } catch (error) {
     return { success: false };
