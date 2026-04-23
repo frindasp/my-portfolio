@@ -12,7 +12,7 @@ export async function GET(
     const portfolio = await prisma.portfolio.findUnique({
       where: { id },
       include: {
-        Experience: {
+        experience: {
           select: {
             id: true,
             company: true,
@@ -21,13 +21,13 @@ export async function GET(
             startDate: true,
             endDate: true,
             location: true,
-            Skill: { select: { id: true, name: true } },
+            skills: { select: { id: true, name: true } },
           },
         },
-        PortfolioImage: {
+        images: {
           orderBy: { order: "asc" },
         },
-        Tag: true,
+        tags: true,
       },
     })
     if (!portfolio || !portfolio.isPublished) {

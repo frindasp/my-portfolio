@@ -11,8 +11,8 @@ export async function GET() {
         where: { isActive: true },
         orderBy: { order: "asc" },
         include: {
-          Skill: { orderBy: { name: "asc" } },
-          ExperienceImage: { orderBy: { order: "asc" } },
+          skills: { orderBy: { name: "asc" } },
+          images: { orderBy: { order: "asc" } },
         },
       }),
     ])

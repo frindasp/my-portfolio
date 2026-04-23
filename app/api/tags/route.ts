@@ -8,7 +8,7 @@ export async function GET() {
     const tags = await prisma.tag.findMany({
       orderBy: { name: "asc" },
       include: {
-        Portfolio: {
+        portfolios: {
           select: { id: true, title: true }
         }
       }

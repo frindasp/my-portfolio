@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { Message, Conversation } from "@prisma/client";
 
 export type ConversationWithLastMessage = Conversation & {
-  Message: any[];
+  messages: any[];
   userState?: {
     isRead?: boolean;
     isPinned?: boolean;
@@ -33,8 +33,8 @@ interface MessagingState {
   setUser: (user: { id: string; name: string | null; email: string }) => void;
   setAnonymousUser: (userId: string) => void;
   incrementMessageCount: () => void;
-  setMessages: (messages: Message[]) => void;
-  setConversations: (conversations: ConversationWithLastMessage[]) => void;
+  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
+  setConversations: (conversations: ConversationWithLastMessage[] | ((prev: ConversationWithLastMessage[]) => ConversationWithLastMessage[])) => void;
   setActiveConv: (convId: string | null) => void;
   addMessage: (message: Message) => void;
   setEmail: (email: string) => void;
@@ -77,8 +77,12 @@ export const useMessagingStore = create<MessagingState>()(
         isRegistered: false
       }),
       incrementMessageCount: () => set((state) => ({ messageCount: state.messageCount + 1 })),
-      setMessages: (messages) => set({ messages }),
-      setConversations: (conversations) => set({ conversations }),
+      setMessages: (messages) => set((state) => ({ 
+        messages: typeof messages === 'function' ? messages(state.messages) : messages 
+      })),
+      setConversations: (conversations) => set((state) => ({ 
+        conversations: typeof conversations === 'function' ? conversations(state.conversations) : conversations 
+      })),
       setActiveConv: (activeConvId) => set({ activeConvId }),
       addMessage: (message) => set((state) => {
         if (state.messages.some(m => m.id === message.id)) return state;

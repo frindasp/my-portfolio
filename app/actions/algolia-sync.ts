@@ -11,9 +11,9 @@ export async function syncToAlgolia() {
     // 1. Fetch Porfolios with their Tags and Experience
     const portfolios = await prisma.portfolio.findMany({
       include: {
-        Tag: true,
-        Experience: true,
-        PortfolioImage: {
+        tags: true,
+        experience: true,
+        images: {
           where: { isLogo: true },
           take: 1
         }
@@ -23,7 +23,7 @@ export async function syncToAlgolia() {
     // 2. Fetch Experiences separately (if they want to search experiences directly too)
     const experiences = await prisma.experience.findMany({
       include: {
-        Skill: true
+        skills: true
       }
     })
 
@@ -37,10 +37,10 @@ export async function syncToAlgolia() {
         type: "portfolio",
         title: p.title,
         description: p.description,
-        tags: p.Tag.map(t => t.name),
-        company: p.Experience?.company || "",
-        role: p.Experience?.role || "",
-        image: p.PortfolioImage[0]?.url || "",
+        tags: p.tags.map(t => t.name),
+        company: p.experience?.company || "",
+        role: p.experience?.role || "",
+        image: p.images[0]?.url || "",
         url: `/portfolio/${p.id}`
       })
     })
@@ -53,7 +53,7 @@ export async function syncToAlgolia() {
         type: "experience",
         title: `${e.role} at ${e.company}`,
         description: Array.isArray(e.description) ? e.description.join(" ") : "",
-        tags: e.Skill.map(s => s.name),
+        tags: e.skills.map(s => s.name),
         company: e.company,
         role: e.role,
         url: `/about` // Or /experience/${e.id} if you have that page

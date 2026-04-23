@@ -25,7 +25,7 @@ export async function getChatMessages(userId: string) {
         ],
       },
       orderBy: { createdAt: "asc" },
-      include: { User: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, email: true } } },
     });
   } catch (error) {
     console.error("Fetch Messages Error:", error);
@@ -49,7 +49,7 @@ export async function sendChatMessage(content: string) {
         senderId: user.id,
         isAdmin: false, // For users
       },
-      include: { User: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, email: true } } },
     });
 
     return { success: true, message: newMessage };

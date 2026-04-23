@@ -118,7 +118,7 @@ export async function loginWithPassword(email: string, password: string) {
       where: {
         email_roleId: { email, roleId: userRole.id },
       },
-      include: { Role: true },
+      include: { role: true },
     });
 
     if (!user)
@@ -176,7 +176,7 @@ export async function loginWithPassword(email: string, password: string) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.Role.name,
+        role: user.role.name,
         showMfaEnrollment,
       },
     };
@@ -226,7 +226,7 @@ export async function verifyOTPAndLogin(
           name: name || undefined,
           updatedAt: new Date(),
         },
-        include: { Role: true },
+        include: { role: true },
       });
     } else {
       user = await prisma.user.upsert({
@@ -244,7 +244,7 @@ export async function verifyOTPAndLogin(
           name: name || null,
           updatedAt: new Date(),
         },
-        include: { Role: true },
+        include: { role: true },
       });
     }
   } else {
@@ -253,7 +253,7 @@ export async function verifyOTPAndLogin(
       where: {
         email_roleId: { email, roleId: userRole.id },
       },
-      include: { Role: true },
+      include: { role: true },
     });
   }
 
@@ -306,7 +306,7 @@ export async function verifyOTPAndLogin(
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.Role.name,
+      role: user.role.name,
     },
   };
 }
@@ -379,7 +379,7 @@ export async function getCurrentUser() {
   try {
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, Role: true },
+      select: { id: true, email: true, name: true, role: true },
     });
   } catch (error) {
     return null;
@@ -394,7 +394,7 @@ export async function getMessages(email?: string, userId?: string, conversationI
     return await prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: "asc" },
-      include: { User: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, email: true } } },
     });
   }
 
@@ -410,7 +410,7 @@ export async function getMessages(email?: string, userId?: string, conversationI
       ],
     },
     orderBy: { createdAt: "asc" },
-    include: { User: { select: { name: true, email: true } } },
+    include: { user: { select: { name: true, email: true } } },
   });
 
   return messages;
@@ -459,7 +459,7 @@ export async function sendChatMessage(
         where: {
           OR: [
             ...(emailToUse ? [{ email: emailToUse }] : []),
-            ...(userId ? [{ Message: { some: { senderId: userId } } }] : [])
+            ...(userId ? [{ messages: { some: { senderId: userId } } }] : [])
           ]
         },
         orderBy: { updatedAt: "desc" }
@@ -487,7 +487,7 @@ export async function sendChatMessage(
         status: 'SENT',
       },
       include: {
-        User: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true } },
       }
     });
 
@@ -498,10 +498,18 @@ export async function sendChatMessage(
       });
 
       // Trigger Pusher
-      await pusherServer.trigger(`conversation-${finalConvId}`, "new-message", {
+      const pusherMessage = {
         ...message,
         senderRole: "user",
-        sender: { name: message.User?.name || message.senderEmail || "Guest" }
+        sender: { name: message.user?.name || message.senderEmail || "Guest" }
+      };
+
+      await pusherServer.trigger(`conversation-${finalConvId}`, "new-message", pusherMessage);
+      
+      // Notify admin
+      await pusherServer.trigger("admin-notifications", "conversation-updated", {
+        conversationId: finalConvId,
+        lastMessage: pusherMessage
       });
     }
 
@@ -522,14 +530,14 @@ export async function getConversations(email?: string, userId?: string) {
 
   if (!resolvedEmail && !resolvedUserId && !currentUser) return [];
 
-  const isAdmin = currentUser?.Role?.name === "Admin";
+  const isAdmin = currentUser?.role?.name === "Admin";
 
   const findWhere = isAdmin 
     ? {} 
     : { 
         OR: [
           { email: resolvedEmail || undefined },
-          { Message: { some: { senderId: resolvedUserId || undefined } } }
+          { messages: { some: { senderId: resolvedUserId || undefined } } }
         ]
       };
 
@@ -537,7 +545,7 @@ export async function getConversations(email?: string, userId?: string) {
     where: findWhere,
     orderBy: { updatedAt: "desc" },
     include: {
-      Message: {
+      messages: {
         orderBy: { createdAt: "desc" },
         take: 1,
       },
@@ -559,6 +567,7 @@ export async function getConversations(email?: string, userId?: string) {
 
   return conversations.map(conv => ({
     ...conv,
+    lastMessage: conv.messages?.[0],
     userState: stateMap[conv.id] || {
       isRead: true,
       isPinned: false,
@@ -592,7 +601,7 @@ export async function getUnreadConversationCounts(email?: string, userId?: strin
     where: {
       OR: [
         { email: resolvedEmail || undefined },
-        { Message: { some: { senderEmail: resolvedEmail || undefined } } }
+        { messages: { some: { senderEmail: resolvedEmail || undefined } } }
       ]
     },
     select: {
@@ -823,6 +832,8 @@ export async function updateUserStatus(isOnline: boolean) {
 
     await pusherServer.trigger("user-status", "status-changed", {
       userId: user.id,
+      email: user.email,
+      name: user.name,
       isOnline,
       lastSeen: lastSeen.toISOString(),
     });

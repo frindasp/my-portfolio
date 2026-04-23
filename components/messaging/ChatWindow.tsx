@@ -146,7 +146,7 @@ export default function ChatWindow(): React.ReactElement | null {
         updated[idx] = {
           ...updated[idx],
           updatedAt: data.lastMessage.createdAt ? new Date(data.lastMessage.createdAt) : new Date(),
-          Message: [data.lastMessage],
+          messages: [data.lastMessage],
         };
         const sorted = updated.sort(
           (a, b) =>
@@ -222,17 +222,17 @@ export default function ChatWindow(): React.ReactElement | null {
     });
 
     channel.bind("message-status-updated", (data: { messageId: string; status: "SENT" | "DELIVERED" | "READ" }) => {
-      setMessages(messages.map(m => m.id === data.messageId ? { ...m, status: data.status } : m));
+      setMessages((prev: any[]) => prev.map(m => m.id === data.messageId ? { ...m, status: data.status } : m));
     });
 
     channel.bind("conversation-status-updated", (data: { conversationId: string; status: "SENT" | "DELIVERED" | "READ" }) => {
-      setMessages(messages.map(m => m.status !== "READ" ? { ...m, status: data.status } : m));
+      setMessages((prev: any[]) => prev.map(m => (m.status !== "READ" || data.status === "READ") ? { ...m, status: data.status } : m));
     });
 
     return () => {
       pusherClient.unsubscribe(channelName);
     };
-  }, [activeConvId, setMessages, addMessage, userId, messages]);
+  }, [activeConvId, setMessages, addMessage, userId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -326,7 +326,7 @@ export default function ChatWindow(): React.ReactElement | null {
     try {
       const res = await createConversation(newTitle);
       if (res.success && res.conversation) {
-        setConversations([{ ...res.conversation, Message: [] }, ...conversations]);
+        setConversations([{ ...res.conversation, messages: [] }, ...conversations]);
         setActiveConv(res.conversation.id);
         setNewTitle("");
       } else {
@@ -492,7 +492,7 @@ export default function ChatWindow(): React.ReactElement | null {
                           {typingUsers[c.id]?.length > 0 ? (
                             <span className="text-primary animate-pulse italic font-bold">Sedang mengetik...</span>
                           ) : (
-                            <>{c.userAlias ? `[${c.userAlias}] ` : ""}{c.Message?.[0]?.content || "..."}</>
+                            <>{c.userAlias ? `[${c.userAlias}] ` : ""}{c.messages?.[0]?.content || "..."}</>
                           )}
                        </p>
                        {unreadCounts[c.id] !== undefined && (
@@ -555,9 +555,14 @@ export default function ChatWindow(): React.ReactElement | null {
                 <User className="h-3 w-3" />
               </button>
             </div>
-            <div className="flex items-center gap-1 mt-0.5">
-               <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Real-time</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+               <div className={cn(
+                 "h-1.5 w-1.5 rounded-full",
+                 Object.values(onlineUsers).some(u => u.isOnline) ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"
+               )} />
+               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">
+                 {Object.values(onlineUsers).some(u => u.isOnline) ? "ONLINE" : "OFFLINE"}
+               </p>
             </div>
           </div>
         </div>
@@ -622,13 +627,25 @@ export default function ChatWindow(): React.ReactElement | null {
             <div 
               key={msg.id}
               className={cn(
-                "flex flex-col max-w-[85%] rounded-2xl px-4 py-2.5 text-sm transition-all animate-in fade-in duration-500",
+                "flex flex-col max-w-[85%] transition-all animate-in fade-in duration-500",
                 (msg.senderId === userId || msg.senderEmail === userEmail || (!userId && msg.senderEmail === `${guestSessionId}@guest.com`) || msg.isAdmin === false)
-                  ? "self-end bg-primary text-primary-foreground rounded-tr-none shadow-md shadow-primary/10"
-                  : "self-start bg-background text-foreground rounded-tl-none border shadow-sm"
+                  ? "items-end ml-auto"
+                  : "items-start mr-auto"
               )}
             >
-              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              {msg.isAdmin && (
+                <span className="text-[9px] font-bold mb-1 opacity-50 px-1">
+                  Admin - {activeConv?.adminAlias || msg.user?.name || msg.senderEmail || "Support"}
+                </span>
+              )}
+              <div className={cn(
+                "rounded-2xl px-4 py-2.5 text-sm",
+                (msg.senderId === userId || msg.senderEmail === userEmail || (!userId && msg.senderEmail === `${guestSessionId}@guest.com`) || msg.isAdmin === false)
+                  ? "bg-primary text-primary-foreground rounded-tr-none shadow-md shadow-primary/10"
+                  : "bg-background text-foreground rounded-tl-none border shadow-sm"
+              )}>
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              </div>
               <div className="flex items-center gap-1 self-end">
                 <span className="mt-1.5 text-[9px] opacity-50 font-mono">
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

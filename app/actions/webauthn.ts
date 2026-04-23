@@ -38,7 +38,7 @@ export async function generateRegistrationOptionsAction() {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { authenticators: true },
+    include: { Authenticator: true },
   });
 
   if (!user) return { success: false, error: "User not found" };
@@ -50,7 +50,7 @@ export async function generateRegistrationOptionsAction() {
     userName: user.email,
     userDisplayName: user.name || user.email,
     attestationType: "none",
-    excludeCredentials: user.authenticators.map((auth) => ({
+    excludeCredentials: user.Authenticator.map((auth) => ({
       id: auth.credentialID,
       type: "public-key",
     })),
@@ -280,23 +280,23 @@ export async function generateAuthenticationOptionsAction(email?: string) {
 
   if (!targetEmail) return { success: false, error: "Email is required for this operation." };
 
-  // Find user that actually has authenticators registered
+  // Find user that actually has Authenticator registered
   // (email is not unique alone — it's unique per roleId, so there could be multiple user records)
   const user = await prisma.user.findFirst({
     where: { 
       email: targetEmail,
-      authenticators: { some: { enabled: true } },
+      Authenticator: { some: { enabled: true } },
     },
-    include: { authenticators: { where: { enabled: true } } },
+    include: { Authenticator: { where: { enabled: true } } },
   });
 
-  if (!user || user.authenticators.length === 0) {
+  if (!user || user.Authenticator.length === 0) {
     return { success: false, error: "No passkeys registered for this user." };
   }
 
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: user.authenticators.map((auth) => ({
+    allowCredentials: user.Authenticator.map((auth) => ({
       id: auth.credentialID,
       type: "public-key",
       transports: auth.transports ? JSON.parse(auth.transports) : undefined,
@@ -339,27 +339,27 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
   if (loggedInUserId) {
     user = await prisma.user.findUnique({
       where: { id: loggedInUserId },
-      include: { authenticators: { where: { enabled: true } }, Role: true },
+      include: { Authenticator: { where: { enabled: true } }, role: true },
     });
   } else if (authEmail) {
     user = await prisma.user.findFirst({
-      where: { email: authEmail, authenticators: { some: { enabled: true } } },
-      include: { authenticators: { where: { enabled: true } }, Role: true },
+      where: { email: authEmail, Authenticator: { some: { enabled: true } } },
+      include: { Authenticator: { where: { enabled: true } }, role: true },
     });
   }
 
   // Fallback for Discoverable Credentials: find user by credentialId
   if (!user) {
     user = await prisma.user.findFirst({
-      where: { authenticators: { some: { credentialID: body.id, enabled: true } } },
-      include: { authenticators: { where: { enabled: true } }, Role: true },
+      where: { Authenticator: { some: { credentialID: body.id, enabled: true } } },
+      include: { Authenticator: { where: { enabled: true } }, role: true },
     });
   }
 
   if (!user) return { success: false, error: "User not found for this passkey." };
 
 
-  const authenticator = user.authenticators.find(
+  const authenticator = user.Authenticator.find(
     (auth) => auth.credentialID === body.id
   );
 
@@ -408,7 +408,7 @@ export async function verifyAuthenticationAction(body: AuthenticationResponseJSO
 
       return { 
         success: true, 
-        user: { id: user.id, email: user.email, name: user.name, role: user.Role.name } 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role.name } 
       };
     }
 

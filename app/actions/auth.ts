@@ -17,7 +17,7 @@ export async function loginWithPassword(email: string, password: string) {
   try {
     const user = await prisma.user.findFirst({
       where: { email },
-      include: { Role: true },
+      include: { role: true },
     });
 
     if (!user) {
@@ -48,7 +48,7 @@ export async function loginWithPassword(email: string, password: string) {
 
     return { 
       success: true, 
-      user: { id: user.id, email: user.email, name: user.name, role: user.Role.name } 
+      user: { id: user.id, email: user.email, name: user.name, role: user.role.name } 
     };
   } catch (error) {
     console.error("Login Error:", error);
@@ -120,7 +120,7 @@ export async function verifyOTP(email: string, token: string) {
 
     let user = await prisma.user.findFirst({
       where: { email, roleId: userRole.id },
-      include: { Role: true },
+      include: { role: true },
     });
 
     if (!user) {
@@ -133,7 +133,7 @@ export async function verifyOTP(email: string, token: string) {
           password: hashedPassword,
           name: email.split("@")[0],
         },
-        include: { Role: true },
+        include: { role: true },
       })) as any;
     }
 
@@ -157,7 +157,7 @@ export async function verifyOTP(email: string, token: string) {
 
     return { 
       success: true, 
-      user: { id: user!.id, email: user!.email, name: user!.name, role: user!.Role.name } 
+      user: { id: user!.id, email: user!.email, name: user!.name, role: user!.role.name } 
     };
   } catch (error) {
     console.error("OTP Verification Error:", error);
@@ -306,7 +306,7 @@ export async function getCurrentUser() {
   try {
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, twoFactorEnabled: true, Role: true, mfaDismissedAt: true },
+      select: { id: true, email: true, name: true, twoFactorEnabled: true, role: true, mfaDismissedAt: true },
     });
   } catch (error) {
     return null;
@@ -351,7 +351,7 @@ export async function updateCurrentUserFullName(fullName: string) {
 
 export async function getVerificationTokens() {
   const user = await getCurrentUser();
-  if (!user || (user.Role as any).name !== "Admin") {
+  if (!user || (user.role as any).name !== "Admin") {
     return { success: false, error: "Unauthorized" };
   }
 

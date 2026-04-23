@@ -12,9 +12,9 @@ export async function GET(
     const experience = await prisma.experience.findUnique({
       where: { id, isActive: true },
       include: {
-        Skill: { orderBy: { name: "asc" } },
-        ExperienceImage: { orderBy: { order: "asc" } },
-        Portfolio: {
+        skills: { orderBy: { name: "asc" } },
+        images: { orderBy: { order: "asc" } },
+        portfolios: {
           where: { isPublished: true },
           orderBy: { order: "asc" },
         },

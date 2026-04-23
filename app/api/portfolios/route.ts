@@ -9,13 +9,13 @@ export async function GET() {
       where: { isPublished: true },
       orderBy: { order: "asc" },
       include: {
-        Experience: {
+        experience: {
           select: { id: true, company: true, role: true },
         },
-        PortfolioImage: {
+        images: {
           orderBy: { order: "asc" },
         },
-        Tag: true,
+        tags: true,
       },
     })
     return NextResponse.json(portfolios)
