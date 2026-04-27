@@ -17,6 +17,10 @@ export async function GET(
         portfolios: {
           where: { isPublished: true },
           orderBy: { order: "asc" },
+          include: {
+            images: { orderBy: { order: "asc" } },
+            tags: true,
+          },
         },
       },
     })

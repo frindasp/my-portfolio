@@ -13,6 +13,13 @@ export async function GET() {
         include: {
           skills: { orderBy: { name: "asc" } },
           images: { orderBy: { order: "asc" } },
+          portfolios: {
+            where: { isPublished: true },
+            include: {
+              images: { orderBy: { order: "asc" } },
+              tags: true,
+            },
+          },
         },
       }),
     ])

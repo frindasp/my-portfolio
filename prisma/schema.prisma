@@ -238,6 +238,8 @@ model Portfolio {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   experience   Experience?      @relation(fields: [experienceId], references: [id])
+  behanceUrl   String?
+  tools        String?
   images       PortfolioImage[]
   tags         Tag[]            @relation("PortfolioToTag")
 

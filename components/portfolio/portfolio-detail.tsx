@@ -6,7 +6,7 @@ import Link from "next/link"
 import { ArrowLeft, Briefcase, MapPin, Calendar, Tag, ExternalLink } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Portfolio } from "@/lib/types"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 function computePeriodLabel(startDate?: string, endDate?: string | null): string {
   if (!startDate) return ""
@@ -37,13 +37,24 @@ async function fetchPortfolio(id: string): Promise<Portfolio> {
 }
 
 export function PortfolioDetail({ id }: { id: string }) {
-  const [activeImg, setActiveImg] = useState(0)
-
   const { data: portfolio, isLoading, isError } = useQuery<Portfolio>({
     queryKey: ["portfolio", id],
     queryFn: () => fetchPortfolio(id),
     staleTime: 60 * 1000,
   })
+
+  const images = portfolio?.images || []
+  const tags = portfolio?.tags || []
+  const exp = portfolio?.experience
+
+  const [activeImg, setActiveImg] = useState(0)
+
+  useEffect(() => {
+    if (portfolio?.images) {
+      const logoIdx = portfolio.images.findIndex(img => img.isLogo)
+      if (logoIdx !== -1) setActiveImg(logoIdx)
+    }
+  }, [portfolio])
 
   if (isLoading) {
     return (
@@ -67,10 +78,6 @@ export function PortfolioDetail({ id }: { id: string }) {
       </div>
     )
   }
-
-  const images = portfolio.PortfolioImage || []
-  const tags = portfolio.Tag || []
-  const exp = portfolio.Experience
 
   return (
     <article className="max-w-4xl mx-auto py-8 space-y-8">
@@ -170,9 +177,9 @@ export function PortfolioDetail({ id }: { id: string }) {
                   )}
                 </div>
               )}
-              {exp.Skill && exp.Skill.length > 0 && (
+              {exp.skills && exp.skills.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {exp.Skill.map((s) => (
+                  {exp.skills.map((s) => (
                     <span
                       key={s.id}
                       className="px-2 py-0.5 rounded-full text-xs border border-border bg-background text-muted-foreground"

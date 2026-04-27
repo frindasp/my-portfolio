@@ -11,6 +11,8 @@ export interface ExperienceImage {
   caption?: string | null
   order: number
   experienceId: string
+  isLogo: boolean
+  source: string
   createdAt: string
 }
 
@@ -27,8 +29,9 @@ export interface Experience {
   isActive: boolean
   createdAt: string
   updatedAt: string
-  ExperienceImage: ExperienceImage[]
-  Skill: Skill[]
+  images: ExperienceImage[]
+  skills: Skill[]
+  portfolios: Portfolio[]
 }
 
 export interface PortfolioExperience {
@@ -39,7 +42,7 @@ export interface PortfolioExperience {
   startDate?: string
   endDate?: string | null
   location?: string
-  Skill?: Skill[]
+  skills?: Skill[]
 }
 
 export interface PortfolioImage {
@@ -66,9 +69,9 @@ export interface Portfolio {
   isPublished: boolean
   createdAt: string
   updatedAt: string
-  Experience?: PortfolioExperience | null
-  PortfolioImage: PortfolioImage[]
-  Tag: Tag[]
+  experience?: PortfolioExperience | null
+  images: PortfolioImage[]
+  tags: Tag[]
 }
 
 export interface AboutData {

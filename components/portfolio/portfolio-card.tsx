@@ -11,13 +11,12 @@ interface PortfolioCardProps {
 }
 
 export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
-  const images = portfolio.PortfolioImage || []
-  const tags = portfolio.Tag || []
+  const images = portfolio.images || []
+  const tags = portfolio.tags || []
   const coverImage = images.find((img) => img.isLogo)?.url || images[0]?.url
 
   return (
-    <Link
-      href={`/portfolio/${portfolio.id}`}
+    <div
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card",
         "transition-all duration-300 ease-out",
@@ -25,6 +24,10 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
       )}
     >
+      <Link href={`/portfolio/${portfolio.id}`} className="absolute inset-0 z-10">
+        <span className="sr-only">View {portfolio.title}</span>
+      </Link>
+
       {/* Cover image */}
       <div className="relative overflow-hidden bg-muted aspect-[4/3]">
         {coverImage ? (
@@ -44,7 +47,7 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Arrow icon */}
-        <div className="absolute top-3 right-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+        <div className="absolute top-3 right-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 z-20">
           <div className="bg-white/90 dark:bg-black/80 rounded-full p-1.5 backdrop-blur-sm">
             <ArrowUpRight className="w-4 h-4 text-foreground" />
           </div>
@@ -52,7 +55,7 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
 
         {/* Image count badge */}
         {images.length > 1 && (
-          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm">
+          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm z-20">
             +{images.length - 1} more
           </div>
         )}
@@ -71,11 +74,16 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
         )}
 
         {/* Experience link */}
-        {portfolio.Experience && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-auto">
-            <Briefcase className="w-3 h-3 shrink-0" />
-            <span className="truncate">{portfolio.Experience.company}</span>
-          </p>
+        {portfolio.experience && (
+          <div className="relative z-20 mt-auto">
+            <Link 
+              href={`/experience#${portfolio.experience.id}`}
+              className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors w-fit"
+            >
+              <Briefcase className="w-3 h-3 shrink-0" />
+              <span className="truncate">{portfolio.experience.company}</span>
+            </Link>
+          </div>
         )}
 
         {/* Tags */}
@@ -99,6 +107,6 @@ export function PortfolioCard({ portfolio, priority }: PortfolioCardProps) {
 
       {/* Bottom accent line on hover */}
       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/60 to-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-    </Link>
+    </div>
   )
 }

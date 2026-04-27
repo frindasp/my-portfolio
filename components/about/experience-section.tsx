@@ -50,12 +50,14 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
       <ol className="relative border-l border-border space-y-10 ml-3">
         {experiences.map((exp) => {
           const description = exp.description as string[]
-          const skills = exp.Skill ?? []
-          const images = exp.ExperienceImage ?? []
-          const firstImage = images[0]
+          const skills = exp.skills ?? []
+          const images = exp.images ?? []
+          const portfolios = exp.portfolios ?? []
+          // Try to find image with isLogo, otherwise use the first one
+          const firstImage = images.find(img => img.isLogo) || images[0]
 
           return (
-            <li key={exp.id} className="pl-8 relative group">
+            <li key={exp.id} id={exp.id} className="pl-8 relative group scroll-mt-20">
               {/* Timeline dot */}
               <span className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-border bg-background transition-colors group-hover:border-primary" />
 
@@ -115,6 +117,49 @@ export function ExperienceSection({ experiences }: ExperienceSectionProps) {
                       {skill.name}
                     </span>
                   ))}
+                </div>
+              )}
+
+              {/* Related Portfolios */}
+              {portfolios.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Related Projects
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {portfolios.map((p) => {
+                      const cover = p.images?.find(img => img.isLogo)?.url || p.images?.[0]?.url
+                      return (
+                        <Link
+                          key={p.id}
+                          href={`/portfolio/${p.id}`}
+                          className="group/p relative flex items-center gap-3 p-2 rounded-lg border border-border bg-card/50 hover:border-primary/30 hover:bg-card transition-all"
+                        >
+                          <div className="relative w-12 h-12 rounded overflow-hidden bg-muted shrink-0">
+                            {cover ? (
+                              <img src={cover} alt={p.title} className="w-full h-full object-cover transition-transform group-hover/p:scale-110" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Briefcase className="w-5 h-5 text-muted-foreground/30" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate group-hover/p:text-primary transition-colors">
+                              {p.title}
+                            </p>
+                            <div className="flex gap-1 mt-0.5">
+                              {p.tags?.slice(0, 1).map(tag => (
+                                <span key={tag.id} className="text-[10px] text-muted-foreground truncate italic">
+                                  #{tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </li>

@@ -29,19 +29,14 @@ function computePeriodLabel(startDate: string, endDate?: string | null): string 
   return `${startLabel} – ${endLabel} · ${duration}`
 }
 
-// Extended type for experience with portfolio
-interface ExperienceWithPortfolio extends Experience {
-  Portfolio: Portfolio[]
-}
-
-async function fetchExperience(id: string): Promise<ExperienceWithPortfolio> {
+async function fetchExperience(id: string): Promise<Experience> {
   const res = await fetch(`/api/experiences/${id}`)
   if (!res.ok) throw new Error("Not found")
   return res.json()
 }
 
 export function ExperienceDetail({ id }: { id: string }) {
-  const { data: exp, isLoading, isError } = useQuery<ExperienceWithPortfolio>({
+  const { data: exp, isLoading, isError } = useQuery<Experience>({
     queryKey: ["experience", id],
     queryFn: () => fetchExperience(id),
     staleTime: 60 * 1000,
@@ -73,9 +68,9 @@ export function ExperienceDetail({ id }: { id: string }) {
   }
 
   const description = exp.description as string[]
-  const skills = exp.Skill ?? []
-  const images = exp.ExperienceImage ?? []
-  const portfolios = exp.Portfolio ?? []
+  const skills = exp.skills ?? []
+  const images = exp.images ?? []
+  const portfolios = exp.portfolios ?? []
 
   return (
     <article className="max-w-3xl mx-auto py-8 space-y-10">
