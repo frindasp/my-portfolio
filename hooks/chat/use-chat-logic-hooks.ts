@@ -56,7 +56,10 @@ export function useChatLogicHooks() {
         setUnreadCounts(unreadMap || {});
         const total = (Object.values(unreadMap || {}) as number[]).reduce((acc: number, val: number) => acc + (val > 0 ? val : 0), 0);
         setGlobalUnreadCount(total);
-        if (convs.length > 0) setActiveConvId(convs[0].id);
+        // Only select first conversation on desktop view, keep null on mobile so list is shown first
+        if (convs.length > 0 && typeof window !== "undefined" && window.innerWidth >= 768) {
+          setActiveConvId(convs[0].id);
+        }
       }
       setLoading(false);
     };
