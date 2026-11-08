@@ -121,8 +121,17 @@ export function useChatLogicHooks() {
     return () => { pusherClient.unsubscribe(channelName); };
   }, [activeConvId, setGlobalUnreadCount]);
 
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
+
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    scrollToBottom("auto");
   }, [messages]);
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -132,8 +141,11 @@ export function useChatLogicHooks() {
     try {
       const res = await sendChatMessage(content, user.email, user.id, activeConvId);
       if (res.success && res.message) {
-        setMessages(prev => [...prev, res.message]);
+        setMessages((prev) =>
+          prev.some((m) => m.id === res.message.id) ? prev : [...prev, res.message]
+        );
         setContent("");
+        setTimeout(() => scrollToBottom("smooth"), 50);
       }
     } catch (err) { toast.error(t_chat.toasts.error); }
     finally { setSending(false); }

@@ -437,8 +437,10 @@ export function ChatPageContent() {
               ) : (
                 messages.map((msg, idx) => {
                   const isMe =
-                    msg.senderId === user.id ||
-                    (msg.isAdmin && user.Role?.name === "Admin");
+                    (msg.senderId && user?.id && msg.senderId === user.id) ||
+                    (msg.senderEmail && user?.email && msg.senderEmail.toLowerCase() === user.email.toLowerCase()) ||
+                    (!msg.isAdmin && user?.role?.name !== "Admin" && msg.senderId === user?.id) ||
+                    (msg.isAdmin && (user?.role?.name === "Admin" || user?.Role?.name === "Admin"));
                   return (
                     <div
                       key={msg.id}
@@ -458,6 +460,7 @@ export function ChatPageContent() {
                         {isMe
                           ? "ME"
                           : activeConv?.adminAlias?.charAt(0) ||
+                            msg.user?.name?.charAt(0) ||
                             msg.User?.name?.charAt(0) ||
                             "?"}
                       </div>
