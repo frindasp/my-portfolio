@@ -441,6 +441,34 @@ export function ChatPageContent() {
                     (msg.senderEmail && user?.email && msg.senderEmail.toLowerCase() === user.email.toLowerCase()) ||
                     (!msg.isAdmin && user?.role?.name !== "Admin" && msg.senderId === user?.id) ||
                     (msg.isAdmin && (user?.role?.name === "Admin" || user?.Role?.name === "Admin"));
+
+                  const getAdminLabel = () => {
+                    if (activeConv?.adminAlias) return `Admin - ${activeConv.adminAlias}`;
+                    if (msg.sender?.name) return msg.sender.name;
+                    const role = msg.user?.Role?.name || msg.User?.Role?.name || "Admin";
+                    const name = msg.user?.name || msg.User?.name;
+                    const email = msg.user?.email || msg.User?.email || msg.senderEmail;
+                    let initial = "";
+                    if (name && name.trim()) {
+                      const parts = name.trim().split(/\s+/);
+                      initial = parts.length > 1 ? parts.map((p: string) => p[0].toUpperCase()).join("") : name.slice(0, 2).toUpperCase();
+                    } else if (email) {
+                      const localPart = email.split("@")[0] || "";
+                      const noVowels = localPart.replace(/[aeiouAEIOU]/g, "");
+                      initial = (noVowels || localPart).slice(0, 4).toUpperCase();
+                    } else {
+                      initial = "ADM";
+                    }
+                    return `${role} - ${initial}`;
+                  };
+
+                  const adminLabel = !isMe && msg.isAdmin ? getAdminLabel() : null;
+                  const initialLetter = isMe
+                    ? "ME"
+                    : adminLabel
+                      ? adminLabel.split(" - ")[1] || "A"
+                      : activeConv?.userAlias?.charAt(0) || msg.user?.name?.charAt(0) || "?";
+
                   return (
                     <div
                       key={msg.id}
@@ -451,18 +479,13 @@ export function ChatPageContent() {
                     >
                       <div
                         className={cn(
-                          "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold transition-all",
+                          "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold transition-all overflow-hidden",
                           isMe
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted shadow-sm",
                         )}
                       >
-                        {isMe
-                          ? "ME"
-                          : activeConv?.adminAlias?.charAt(0) ||
-                            msg.user?.name?.charAt(0) ||
-                            msg.User?.name?.charAt(0) ||
-                            "?"}
+                        {initialLetter}
                       </div>
                       <div
                         className={cn(
@@ -470,6 +493,11 @@ export function ChatPageContent() {
                           isMe ? "items-end" : "items-start",
                         )}
                       >
+                        {adminLabel && (
+                          <span className="text-[10px] font-bold text-muted-foreground/80 mb-1 px-1">
+                            {adminLabel}
+                          </span>
+                        )}
                         <div
                           className={cn(
                             "px-4 py-3 rounded-2xl text-[13px] leading-snug shadow-sm",

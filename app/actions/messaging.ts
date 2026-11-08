@@ -390,11 +390,23 @@ export async function getCurrentUser() {
  * Fetch messages for the user or a specific conversation.
  */
 export async function getMessages(email?: string, userId?: string, conversationId?: string) {
+  const userInclude = {
+    select: {
+      name: true,
+      email: true,
+      Role: { select: { name: true } },
+      UserImage: { select: { imageUrl: true } }
+    }
+  };
+
   if (conversationId) {
     return await prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: "asc" },
-      include: { user: { select: { name: true, email: true } } },
+      include: { 
+        user: userInclude,
+        conversation: { select: { adminAlias: true, userAlias: true } }
+      },
     });
   }
 
@@ -410,7 +422,10 @@ export async function getMessages(email?: string, userId?: string, conversationI
       ],
     },
     orderBy: { createdAt: "asc" },
-    include: { user: { select: { name: true, email: true } } },
+    include: { 
+      user: userInclude,
+      conversation: { select: { adminAlias: true, userAlias: true } }
+    },
   });
 
   return messages;
@@ -487,7 +502,14 @@ export async function sendChatMessage(
         status: 'SENT',
       },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { 
+          select: { 
+            name: true, 
+            email: true,
+            Role: { select: { name: true } },
+            UserImage: { select: { imageUrl: true } }
+          } 
+        },
       }
     });
 
@@ -501,7 +523,10 @@ export async function sendChatMessage(
       const pusherMessage = {
         ...message,
         senderRole: "user",
-        sender: { name: message.user?.name || message.senderEmail || "Guest" }
+        sender: { 
+          name: message.user?.name || message.senderEmail || "Guest",
+          imageUrl: message.user?.UserImage?.imageUrl || null
+        }
       };
 
       await pusherServer.trigger(`conversation-${finalConvId}`, "new-message", pusherMessage);
