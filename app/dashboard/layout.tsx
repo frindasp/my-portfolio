@@ -27,9 +27,7 @@ const sidebarItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Verification Codes", href: "/dashboard/otp", icon: ShieldCheck, adminOnly: true },
   { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { name: "Profile", href: "/dashboard/profile", icon: User },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-  { name: "History", href: "/dashboard/history", icon: History },
+  { name: "Settings", href: "/dashboard/settings/profile", icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -132,8 +130,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {sidebarItems
             .filter(item => !item.adminOnly || (currentUser?.Role as any)?.name === "Admin")
             .map((item) => {
-            const isActive = pathname === item.href;
-            return (
+              const isActive = pathname === item.href || (item.name === "Settings" && (pathname?.startsWith("/dashboard/settings") ?? false));
+              return (
               <Link
                 key={item.href}
                 href={item.href}
@@ -225,7 +223,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               onClick={() => setIsSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-4 px-4 py-4 rounded-2xl text-base font-medium",
-                pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                (pathname === item.href || (item.name === "Settings" && (pathname?.startsWith("/dashboard/settings") ?? false))) ? "bg-primary text-primary-foreground" : "text-muted-foreground"
               )}
             >
               <item.icon className="h-5 w-5" />
