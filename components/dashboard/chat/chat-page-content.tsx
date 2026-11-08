@@ -436,11 +436,13 @@ export function ChatPageContent() {
                 </div>
               ) : (
                 messages.map((msg, idx) => {
-                  const isMe =
-                    (msg.senderId && user?.id && msg.senderId === user.id) ||
-                    (msg.senderEmail && user?.email && msg.senderEmail.toLowerCase() === user.email.toLowerCase()) ||
-                    (!msg.isAdmin && user?.role?.name !== "Admin" && msg.senderId === user?.id) ||
-                    (msg.isAdmin && (user?.role?.name === "Admin" || user?.Role?.name === "Admin"));
+                  const isUserRole = user?.role?.name !== "Admin" && user?.Role?.name !== "Admin";
+                  const isMe = isUserRole
+                    ? !msg.isAdmin
+                    : (
+                        (msg.senderId && user?.id && msg.senderId === user.id) ||
+                        (msg.isAdmin && (user?.role?.name === "Admin" || user?.Role?.name === "Admin"))
+                      );
 
                   const getAdminLabel = () => {
                     if (activeConv?.adminAlias) return `Admin - ${activeConv.adminAlias}`;
