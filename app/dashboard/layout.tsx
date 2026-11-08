@@ -254,8 +254,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <section className="min-h-0 flex-1 p-4 sm:p-6 md:p-8 lg:p-10">
-          <div className="max-w-6xl mx-auto h-full">
+        <section className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 lg:p-10">
+          <div className="max-w-6xl mx-auto min-h-full">
             {children}
           </div>
         </section>
