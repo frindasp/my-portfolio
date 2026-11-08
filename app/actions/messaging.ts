@@ -400,8 +400,9 @@ export async function getMessages(email?: string, userId?: string, conversationI
       }
     };
 
+    let messages: any[] = [];
     if (conversationId) {
-      return await prisma.message.findMany({
+      messages = await prisma.message.findMany({
         where: { conversationId },
         orderBy: { createdAt: "asc" },
         include: { 
@@ -409,25 +410,58 @@ export async function getMessages(email?: string, userId?: string, conversationI
           conversation: { select: { adminAlias: true, userAlias: true } }
         },
       });
+    } else if (email || userId) {
+      const normalizedEmail = email?.trim().toLowerCase();
+      messages = await prisma.message.findMany({
+        where: {
+          OR: [
+            ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
+            ...(userId ? [{ senderId: userId }] : []),
+          ],
+        },
+        orderBy: { createdAt: "asc" },
+        include: { 
+          user: userInclude,
+          conversation: { select: { adminAlias: true, userAlias: true } }
+        },
+      });
+    } else {
+      return [];
     }
 
-    if (!email && !userId) return [];
+    // Fallback: If an admin message has no senderId/user attached, find the admin user by senderEmail
+    const adminEmailsToLookup = Array.from(
+      new Set(
+        messages
+          .filter(m => m.isAdmin && !m.user && m.senderEmail)
+          .map(m => m.senderEmail)
+      )
+    );
 
-    const normalizedEmail = email?.trim().toLowerCase();
-
-    const messages = await prisma.message.findMany({
-      where: {
-        OR: [
-          ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
-          ...(userId ? [{ senderId: userId }] : []),
-        ],
-      },
-      orderBy: { createdAt: "asc" },
-      include: { 
-        user: userInclude,
-        conversation: { select: { adminAlias: true, userAlias: true } }
-      },
-    });
+    if (adminEmailsToLookup.length > 0) {
+      const fallbackAdmins = await prisma.user.findMany({
+        where: {
+          email: { in: adminEmailsToLookup },
+          role: { name: { in: ["ADMIN", "Admin"] } }
+        },
+        select: {
+          name: true,
+          email: true,
+          role: { select: { name: true } },
+          UserImage: { select: { imageUrl: true } }
+        }
+      });
+      const adminMap = new Map<string, any>();
+      for (const a of fallbackAdmins) {
+        adminMap.set(a.email, a);
+      }
+      return messages.map(m => {
+        if (m.isAdmin && !m.user && m.senderEmail && adminMap.has(m.senderEmail)) {
+          return { ...m, user: adminMap.get(m.senderEmail) };
+        }
+        return m;
+      });
+    }
 
     return messages;
   } catch (err) {

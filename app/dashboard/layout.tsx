@@ -96,7 +96,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     try {
       await logout();
       toast.success("Logged out successfully");
-      router.push("/login");
+      const currentPath = pathname || "/dashboard";
+      router.push(`/login?callbackUrl=${encodeURIComponent(currentPath)}`);
     } catch (error) {
       toast.error("Failed to logout");
     }
