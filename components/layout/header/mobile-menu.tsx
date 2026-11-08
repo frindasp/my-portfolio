@@ -9,6 +9,7 @@ import { logout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { navItems } from "./nav-items";
+import { AlgoliaSearch } from "@/components/search/search-bar";
 
 type Props = { user: any };
 
@@ -40,6 +41,9 @@ export function MobileMenu({ user }: Props) {
         </SheetTrigger>
         <SheetContent side="left" className="w-[85vw] flex flex-col h-dvh">
           <nav className="flex flex-col space-y-6 mt-12 px-2">
+            <div className="pb-2">
+              <AlgoliaSearch />
+            </div>
             {navItems.map((item) => (
               <Link
                 key={item.href}

@@ -430,6 +430,62 @@ export async function updateCurrentUserFullName(fullName: string) {
   }
 }
 
+export async function changePassword({
+  currentPassword,
+  newPassword,
+}: {
+  currentPassword?: string;
+  newPassword?: string;
+}) {
+  if (!currentPassword || !newPassword) {
+    return { success: false, error: "Password saat ini dan password baru harus diisi" };
+  }
+
+  if (newPassword.length < 6) {
+    return { success: false, error: "Password baru minimal 6 karakter" };
+  }
+
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("portfolio_session")?.value;
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return { success: false, error: "User tidak ditemukan" };
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return { success: false, error: "Password saat ini salah" };
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    await logActivity({
+      userId,
+      action: "PASSWORD_CHANGED",
+      description: "Password berhasil diubah melalui halaman settings/password.",
+      route: "/dashboard/settings/password",
+      method: "SERVER_ACTION",
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    return { success: false, error: "Gagal memperbarui password" };
+  }
+}
+
 export async function getVerificationTokens() {
   const user = await getCurrentUser();
   if (!user || (user.role as any).name !== "Admin") {

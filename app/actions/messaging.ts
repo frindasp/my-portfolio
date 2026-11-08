@@ -390,45 +390,50 @@ export async function getCurrentUser() {
  * Fetch messages for the user or a specific conversation.
  */
 export async function getMessages(email?: string, userId?: string, conversationId?: string) {
-  const userInclude = {
-    select: {
-      name: true,
-      email: true,
-      Role: { select: { name: true } },
-      UserImage: { select: { imageUrl: true } }
-    }
-  };
+  try {
+    const userInclude = {
+      select: {
+        name: true,
+        email: true,
+        role: { select: { name: true } },
+        UserImage: { select: { imageUrl: true } }
+      }
+    };
 
-  if (conversationId) {
-    return await prisma.message.findMany({
-      where: { conversationId },
+    if (conversationId) {
+      return await prisma.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: "asc" },
+        include: { 
+          user: userInclude,
+          conversation: { select: { adminAlias: true, userAlias: true } }
+        },
+      });
+    }
+
+    if (!email && !userId) return [];
+
+    const normalizedEmail = email?.trim().toLowerCase();
+
+    const messages = await prisma.message.findMany({
+      where: {
+        OR: [
+          ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
+          ...(userId ? [{ senderId: userId }] : []),
+        ],
+      },
       orderBy: { createdAt: "asc" },
       include: { 
         user: userInclude,
         conversation: { select: { adminAlias: true, userAlias: true } }
       },
     });
+
+    return messages;
+  } catch (err) {
+    console.error("getMessages error:", err);
+    return [];
   }
-
-  if (!email && !userId) return [];
-
-  const normalizedEmail = email?.trim().toLowerCase();
-
-  const messages = await prisma.message.findMany({
-    where: {
-      OR: [
-        ...(normalizedEmail ? [{ senderEmail: normalizedEmail }] : []),
-        ...(userId ? [{ senderId: userId }] : []),
-      ],
-    },
-    orderBy: { createdAt: "asc" },
-    include: { 
-      user: userInclude,
-      conversation: { select: { adminAlias: true, userAlias: true } }
-    },
-  });
-
-  return messages;
 }
 
 /**
@@ -506,7 +511,7 @@ export async function sendChatMessage(
           select: { 
             name: true, 
             email: true,
-            Role: { select: { name: true } },
+            role: { select: { name: true } },
             UserImage: { select: { imageUrl: true } }
           } 
         },
@@ -853,6 +858,13 @@ export async function updateUserStatus(isOnline: boolean) {
     await prisma.user.update({
       where: { id: user.id },
       data: { isOnline, lastSeen }
+    });
+
+    await pusherServer.trigger("user-status", "status-changed", {
+      userId: user.id,
+      email: user.email,
+      isOnline,
+      lastSeen: lastSeen.toISOString(),
     });
 
     return { success: true };

@@ -17,6 +17,7 @@ import {
   toggleConversationMutedStatus,
   clearConversationMessages,
   deleteConversation,
+  updateUserStatus,
 } from "@/app/actions/messaging";
 import { pusherClient } from "@/lib/pusher";
 import { toast } from "sonner";
@@ -48,6 +49,7 @@ export function useChatLogicHooks() {
       const currentUser = await getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
+        updateUserStatus(true);
         const convs = await getConversations();
         setConversations(convs);
         const unreadMap = await getUnreadConversationCounts(currentUser.email, currentUser.id);
@@ -59,6 +61,10 @@ export function useChatLogicHooks() {
       setLoading(false);
     };
     init();
+
+    return () => {
+      updateUserStatus(false);
+    };
   }, [setGlobalUnreadCount]);
 
   useEffect(() => {

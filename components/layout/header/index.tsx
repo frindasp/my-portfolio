@@ -19,9 +19,9 @@ export function HeaderIndex() {
   return (
     <header className="sticky top-0 z-[60] backdrop-blur-md border-b bg-background/80">
       <div className="container mx-auto px-4 py-4 lg:px-24">
-        <div className="flex justify-between items-center gap-4">
+        <div className="flex justify-between items-center gap-2 sm:gap-4">
           <DesktopNav />
-          <div className="flex-1 max-w-sm ml-4 hidden md:block">
+          <div className="flex-1 max-w-sm ml-2 md:ml-4">
             <AlgoliaSearch />
           </div>
           <MobileMenu user={user} />

@@ -445,7 +445,7 @@ export function ChatPageContent() {
                   const getAdminLabel = () => {
                     if (activeConv?.adminAlias) return `Admin - ${activeConv.adminAlias}`;
                     if (msg.sender?.name) return msg.sender.name;
-                    const role = msg.user?.Role?.name || msg.User?.Role?.name || "Admin";
+                    const role = msg.user?.role?.name || msg.user?.Role?.name || msg.User?.role?.name || msg.User?.Role?.name || "Admin";
                     const name = msg.user?.name || msg.User?.name;
                     const email = msg.user?.email || msg.User?.email || msg.senderEmail;
                     let initial = "";

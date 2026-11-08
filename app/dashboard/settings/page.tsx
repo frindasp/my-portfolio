@@ -79,6 +79,61 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-10">
+        {/* Settings Navigation Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <a
+            href="/dashboard/settings/avatar"
+            className="p-4 rounded-2xl border bg-card/60 hover:bg-muted/50 transition-all flex flex-col gap-2 group"
+          >
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+              <SettingsIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Avatar</p>
+              <p className="text-[11px] text-muted-foreground">Foto profil ImageKit</p>
+            </div>
+          </a>
+
+          <a
+            href="/dashboard/settings/profile"
+            className="p-4 rounded-2xl border bg-card/60 hover:bg-muted/50 transition-all flex flex-col gap-2 group"
+          >
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+              <Monitor className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Profile</p>
+              <p className="text-[11px] text-muted-foreground">Data diri akun</p>
+            </div>
+          </a>
+
+          <a
+            href="/dashboard/settings/password"
+            className="p-4 rounded-2xl border bg-card/60 hover:bg-muted/50 transition-all flex flex-col gap-2 group"
+          >
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+              <Check className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Password</p>
+              <p className="text-[11px] text-muted-foreground">Ubah kata sandi</p>
+            </div>
+          </a>
+
+          <a
+            href="/dashboard/settings/theme"
+            className="p-4 rounded-2xl border bg-card/60 hover:bg-muted/50 transition-all flex flex-col gap-2 group"
+          >
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+              <Sun className="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Theme</p>
+              <p className="text-[11px] text-muted-foreground">Pilihan tema</p>
+            </div>
+          </a>
+        </div>
+
         {/* Appearance Settings */}
         <div className="space-y-4">
           <div className="flex items-center gap-3 ml-2">
