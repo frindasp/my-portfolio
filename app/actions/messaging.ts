@@ -856,6 +856,7 @@ export async function loginWithGoogle(credential: string) {
     const payload = await verifyRes.json();
     const googleEmail = payload.email;
     const googleName = payload.name || googleEmail?.split("@")[0] || "User";
+    const googlePicture = payload.picture;
 
     if (!googleEmail) {
       return { success: false, error: "Email not provided by Google account" };
@@ -868,7 +869,7 @@ export async function loginWithGoogle(credential: string) {
       where: {
         email_roleId: { email: googleEmail, roleId: userRole.id },
       },
-      include: { role: true },
+      include: { role: true, UserImage: true },
     });
 
     if (!user) {
@@ -885,7 +886,19 @@ export async function loginWithGoogle(credential: string) {
           password: randomPassword,
           roleId: userRole.id,
         },
-        include: { role: true },
+        include: { role: true, UserImage: true },
+      });
+    }
+
+    // Jika user belum memiliki UserImage dan Google menyediakan picture, simpan otomatis
+    if (!user.UserImage && googlePicture) {
+      await prisma.userImage.create({
+        data: {
+          id: `usr-img-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          userId: user.id,
+          imageUrl: googlePicture,
+          source: "google",
+        },
       });
     }
 

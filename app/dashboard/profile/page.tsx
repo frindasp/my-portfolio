@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, Mail, Shield, Zap, Sparkles, LogOut, ArrowLeft, Loader2, Fingerprint, Settings } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { User, Mail, Shield, Zap, Sparkles, LogOut, ArrowLeft, Loader2, Fingerprint, Settings, Camera, Upload, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { logout, getCurrentUser, updateCurrentUserFullName } from "@/app/actions/auth";
+import { logout, getCurrentUser, updateCurrentUserFullName, updateAvatar } from "@/app/actions/auth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { SecuritySettings } from "@/components/SecuritySettings";
@@ -19,8 +19,51 @@ export default function ProfilePage() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [fullName, setFullName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { activeTab, setActiveTab } = useProfileStore();
   const router = useRouter();
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]!);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await updateAvatar({
+        fileBase64: base64,
+        fileName: file.name,
+      });
+
+      if (!res.success) {
+        toast.error(res.error || "Failed to upload avatar");
+        return;
+      }
+
+      setUser((prev: any) => ({
+        ...prev,
+        UserImage: res.userImage,
+      }));
+      toast.success("Avatar updated successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update avatar");
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     setIsHydrated(true);
@@ -75,8 +118,40 @@ export default function ProfilePage() {
             <Sparkles className="h-48 w-48 text-primary shadow-2xl" />
          </div>
          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-10 relative z-10 text-center md:text-left">
-            <div className="h-28 w-28 md:h-32 md:w-32 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground font-black text-5xl md:text-6xl shadow-2xl shadow-primary/30 transform transition-transform hover:scale-105 active:scale-95 duration-300">
-               {user?.name?.charAt(0).toUpperCase()}
+            <div className="relative group/avatar">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleAvatarFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <div className="h-28 w-28 md:h-32 md:w-32 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground font-black text-5xl md:text-6xl shadow-2xl shadow-primary/30 transform transition-transform overflow-hidden relative border-2 border-primary/20">
+                {user?.UserImage?.imageUrl ? (
+                  <img
+                    src={user.UserImage.imageUrl}
+                    alt={user.name || "Avatar"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  user?.name?.charAt(0).toUpperCase() || "U"
+                )}
+                {avatarUploading && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                aria-label="Change Avatar"
+                className="absolute -bottom-2 -right-2 p-2.5 rounded-2xl bg-card border shadow-lg hover:bg-muted text-foreground transition-all hover:scale-110 active:scale-95"
+                title="Change Avatar (ImageKit)"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
             </div>
             <div className="space-y-3 sm:space-y-4">
                <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter leading-none">{user?.name}</h1>

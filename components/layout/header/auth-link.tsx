@@ -43,8 +43,12 @@ export function DesktopAuthLink({ user }: Props) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 px-4 py-2 rounded-full border bg-card hover:bg-muted transition-all text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20">
-            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <User className="h-3 w-3" />
+            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary overflow-hidden">
+              {user.UserImage?.imageUrl ? (
+                <img src={user.UserImage.imageUrl} alt={user.name || "Avatar"} className="h-full w-full object-cover" />
+              ) : (
+                <User className="h-3 w-3" />
+              )}
             </div>
             {user.name}
           </button>

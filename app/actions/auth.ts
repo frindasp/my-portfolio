@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { sendEmail } from "@/lib/email";
 import * as bcrypt from "bcryptjs";
 import { logActivity } from "@/lib/activity-log";
+import ImageKit from "@imagekit/nodejs";
 
 const prisma = new PrismaClient();
 
@@ -306,10 +307,90 @@ export async function getCurrentUser() {
   try {
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, twoFactorEnabled: true, role: true, mfaDismissedAt: true },
+      select: { 
+        id: true, 
+        email: true, 
+        name: true, 
+        twoFactorEnabled: true, 
+        role: true, 
+        mfaDismissedAt: true,
+        UserImage: true 
+      },
     });
   } catch (error) {
     return null;
+  }
+}
+
+export async function updateAvatar({
+  imageUrl,
+  fileBase64,
+  fileName,
+}: {
+  imageUrl?: string;
+  fileBase64?: string;
+  fileName?: string;
+}) {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("portfolio_session")?.value;
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    let finalUrl = imageUrl?.trim() || "";
+    let fileId: string | null = null;
+    let source = "url";
+
+    if (fileBase64 && fileName) {
+      const imagekit = new ImageKit({
+        privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
+      });
+
+      const uploadRes = await imagekit.files.upload({
+        file: fileBase64,
+        fileName: fileName,
+        folder: "/avatars",
+        useUniqueFileName: true,
+      });
+
+      finalUrl = uploadRes.url || "";
+      fileId = uploadRes.fileId || null;
+      source = "imagekit";
+    }
+
+    if (!finalUrl) {
+      return { success: false, error: "Image URL or file is required" };
+    }
+
+    const userImage = await prisma.userImage.upsert({
+      where: { userId },
+      update: {
+        imageUrl: finalUrl,
+        fileId: fileId ?? null,
+        source,
+      },
+      create: {
+        id: `usr-img-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        userId,
+        imageUrl: finalUrl,
+        fileId: fileId ?? null,
+        source,
+      },
+    });
+
+    await logActivity({
+      userId,
+      action: "AVATAR_UPDATED",
+      description: `Avatar profil diperbarui via ${source}.`,
+      route: "/dashboard/profile",
+      method: "SERVER_ACTION",
+    });
+
+    return { success: true, userImage };
+  } catch (error: any) {
+    console.error("Update Avatar Error:", error);
+    return { success: false, error: error.message || "Failed to update avatar." };
   }
 }
 
