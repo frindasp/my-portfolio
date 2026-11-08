@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getHistoryActivities } from "@/app/actions/history";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 
 const PAGE_SIZES = [10, 20, 40, 80, 100];
 
@@ -31,19 +32,18 @@ export default function HistoryPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black">History Activity</h1>
         <div className="flex items-center gap-2 text-sm">
-          <span>Rows:</span>
-          <select
-            className="bg-card border rounded-lg px-3 py-1"
-            value={pageSize}
-            onChange={(e) => {
+          <span className="text-muted-foreground text-xs font-semibold">Rows:</span>
+          <Combobox
+            options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
+            value={String(pageSize)}
+            onChange={(val) => {
               setPage(1);
-              setPageSize(Number(e.target.value));
+              setPageSize(Number(val));
             }}
-          >
-            {PAGE_SIZES.map((size) => (
-              <option key={size} value={size}>{size}</option>
-            ))}
-          </select>
+            className="w-20 h-8 text-xs font-semibold rounded-lg bg-card"
+            placeholder={String(pageSize)}
+            searchPlaceholder="Rows..."
+          />
         </div>
       </div>
 
