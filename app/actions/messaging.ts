@@ -830,16 +830,93 @@ export async function updateUserStatus(isOnline: boolean) {
       data: { isOnline, lastSeen }
     });
 
-    await pusherServer.trigger("user-status", "status-changed", {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      isOnline,
-      lastSeen: lastSeen.toISOString(),
-    });
-
     return { success: true };
   } catch (error) {
     return { success: false };
+  }
+}
+
+/**
+ * Login or register with Google OAuth ID token / credential
+ */
+export async function loginWithGoogle(credential: string) {
+  if (!credential) {
+    return { success: false, error: "Google credential is required" };
+  }
+
+  try {
+    const verifyRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`
+    );
+
+    if (!verifyRes.ok) {
+      return { success: false, error: "Invalid Google credential" };
+    }
+
+    const payload = await verifyRes.json();
+    const googleEmail = payload.email;
+    const googleName = payload.name || googleEmail?.split("@")[0] || "User";
+
+    if (!googleEmail) {
+      return { success: false, error: "Email not provided by Google account" };
+    }
+
+    const userRole = await getOrCreateRole("User");
+
+    // Cari user berdasarkan email dan role User
+    let user = await prisma.user.findUnique({
+      where: {
+        email_roleId: { email: googleEmail, roleId: userRole.id },
+      },
+      include: { role: true },
+    });
+
+    if (!user) {
+      // Auto-register pengguna baru
+      const randomPassword = await bcrypt.hash(
+        Math.random().toString(36).substring(2) + Date.now().toString(36),
+        10
+      );
+
+      user = await prisma.user.create({
+        data: {
+          email: googleEmail,
+          name: googleName,
+          password: randomPassword,
+          roleId: userRole.id,
+        },
+        include: { role: true },
+      });
+    }
+
+    // Set portfolio_session cookie
+    const cookieStore = await cookies();
+    cookieStore.set("portfolio_session", user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60,
+      path: "/",
+    });
+
+    await logActivity({
+      userId: user.id,
+      action: "LOGIN",
+      description: "Login dengan Google berhasil.",
+      route: "/login",
+      method: "SERVER_ACTION",
+    });
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role.name,
+      },
+    };
+  } catch (error) {
+    console.error("loginWithGoogle error:", error);
+    return { success: false, error: "Failed to authenticate with Google" };
   }
 }

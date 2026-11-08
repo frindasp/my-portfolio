@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { 
   loginWithPassword, 
+  loginWithGoogle,
   sendVerificationOTP, 
   verifyOTPAndLogin,
   forgotPassword,
   resetPassword 
 } from "@/app/actions/messaging";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { 
   generateAuthenticationOptionsAction, 
   verifyAuthenticationAction
@@ -61,6 +63,31 @@ function LoginForm() {
     if (countdown > 0) timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
   }, [countdown]);
+
+  // Handle Google Login
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse?.credential) {
+      toast.error("Google authentication failed");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await loginWithGoogle(credentialResponse.credential);
+      if (res.success) {
+        toast.success("Welcome back!");
+        router.push(callbackUrl);
+        router.refresh();
+      } else {
+        toast.error(res.error || "Google login failed");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong during Google login");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle Login with Password
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -443,6 +470,28 @@ function LoginForm() {
                     <p className="text-xs text-muted-foreground">Sudah punya akun? <button type="button" onClick={() => { setMode("password"); setStep(1); }} className="text-primary hover:underline font-bold">Masuk</button></p>
                   </div>
                 )}
+
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-muted" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground font-semibold">Or continue with</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-center w-full">
+                  <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "510065617704-ahj3vvslkfh3jqlq0dds04mdmjsk6hvm.apps.googleusercontent.com"}>
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => toast.error("Google Sign-In failed or cancelled")}
+                      shape="pill"
+                      size="large"
+                      width="100%"
+                      theme="outline"
+                    />
+                  </GoogleOAuthProvider>
+                </div>
               </div>
             </form>
           </div>
