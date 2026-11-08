@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PortfolioPage() {
   return (
-    <div className="max-w-5xl mx-auto py-8 space-y-8">
+    <div className="w-full py-8 space-y-8">
       <div>
         <h1 className="text-4xl font-bold tracking-tight">Portfolio</h1>
         <p className="text-muted-foreground mt-2 text-base">

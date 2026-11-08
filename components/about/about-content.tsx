@@ -35,7 +35,7 @@ export function AboutContent() {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4 py-8">
+      <div className="w-full space-y-4 py-8">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-4 w-full" />
@@ -48,14 +48,14 @@ export function AboutContent() {
 
   if (isError) {
     return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-muted-foreground">
+      <div className="w-full py-16 text-center text-muted-foreground">
         <p className="text-sm">Failed to load content. Please try again.</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
+    <div className="w-full py-8">
       <AboutSection location={location} email={email} content={content} />
     </div>
   );

@@ -22,7 +22,7 @@ export function ExperienceContent() {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-10 py-8">
+      <div className="w-full space-y-10 py-8">
         <div className="flex items-center gap-2 mb-6">
           <Skeleton className="h-5 w-5 rounded" />
           <Skeleton className="h-7 w-40" />
@@ -45,14 +45,14 @@ export function ExperienceContent() {
 
   if (isError) {
     return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-muted-foreground">
+      <div className="w-full py-16 text-center text-muted-foreground">
         <p className="text-sm">Failed to load experiences. Please try again.</p>
       </div>
     )
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
+    <div className="w-full py-8">
       <ExperienceSection experiences={experiences} />
     </div>
   )
