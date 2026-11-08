@@ -85,6 +85,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [unreadCount]);
 
+  // Prevent outer body scroll when dashboard is mounted
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -97,7 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (checkingAuth) {
     return (
-      <div className="flex min-h-[70vh] w-full max-w-full items-center justify-center overflow-x-hidden bg-background">
+      <div className="flex h-[calc(100dvh-73px-3rem)] w-full max-w-full items-center justify-center overflow-hidden bg-background">
         <div className="flex flex-col items-center gap-4">
           <Zap className="h-10 w-10 animate-pulse text-primary" />
           <p className="text-sm font-medium animate-pulse text-muted-foreground tracking-widest uppercase">Initializing Dashboard...</p>
@@ -107,7 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh-73px)] min-h-0 w-full min-w-0 overflow-hidden rounded-2xl border bg-muted/30">
+    <div className="relative flex h-[calc(100dvh-73px-3rem)] min-h-0 w-full min-w-0 overflow-hidden rounded-2xl border bg-muted/30">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex h-full min-h-0 w-72 flex-col overflow-hidden border-r bg-card shadow-sm">
         <div className="p-8">
