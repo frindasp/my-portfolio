@@ -7,11 +7,9 @@ import {
   verifyRegistrationResponse,
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
+  type RegistrationResponseJSON,
+  type AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
-import type {
-  RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-} from "@simplewebauthn/types";
 import { isoBase64URL, isoUint8Array } from "@simplewebauthn/server/helpers";
 import { logActivity } from "@/lib/activity-log";
 
