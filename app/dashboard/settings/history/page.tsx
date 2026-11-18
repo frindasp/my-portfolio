@@ -57,9 +57,9 @@ export default function SettingsHistoryPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border">
+      <div className={`overflow-x-auto rounded-2xl border ${data.items.length > 5 ? "max-h-[340px] overflow-y-auto" : ""}`}>
         <table className="w-full text-left text-xs">
-          <thead className="bg-muted/40 font-bold uppercase tracking-wider text-muted-foreground border-b text-[10px]">
+          <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm font-bold uppercase tracking-wider text-muted-foreground border-b text-[10px]">
             <tr>
               <th className="p-4">Waktu</th>
               <th className="p-4">Action</th>
