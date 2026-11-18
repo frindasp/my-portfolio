@@ -58,7 +58,7 @@ export default function PasswordSettingsPage() {
         </p>
       </div>
 
-      <div className="bg-card border rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+      <div className="space-y-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

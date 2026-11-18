@@ -270,16 +270,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page Content */}
-        <section className={cn(
-          "min-h-0 flex-1 p-4 sm:p-6 md:p-8 lg:p-10",
-          pathname === "/dashboard/chat" ? "h-full overflow-hidden" : "overflow-y-auto"
-        )}>
-          <div className={cn(
-            "max-w-6xl mx-auto",
-            pathname === "/dashboard/chat" ? "h-full" : "min-h-full"
-          )}>
-            {children}
-          </div>
+        <section className="min-h-0 flex-1 p-3 sm:p-4 md:p-6 flex flex-col overflow-hidden">
+          {pathname === "/dashboard/chat" || (pathname?.startsWith("/dashboard/settings") ?? false) ? (
+            <div className="max-w-6xl w-full mx-auto h-full min-h-0 flex flex-col overflow-hidden">
+              {children}
+            </div>
+          ) : (
+            <div className="max-w-6xl w-full mx-auto flex-1 min-h-0 overflow-y-auto rounded-3xl border bg-card p-4 sm:p-6 md:p-8 shadow-sm">
+              {children}
+            </div>
+          )}
         </section>
       </main>
     </div>

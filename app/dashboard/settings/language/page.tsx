@@ -39,7 +39,7 @@ export default function LanguageSettingsPage() {
         </p>
       </div>
 
-      <div className="bg-card border rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+      <div className="space-y-6">
         <div className="space-y-3">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Bahasa (Combobox Autocomplete)
@@ -54,7 +54,7 @@ export default function LanguageSettingsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-4 border-t">
           {languages.map((l) => (
             <button
               key={l.id}

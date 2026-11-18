@@ -34,7 +34,7 @@ export default function ThemeSettingsPage() {
         </p>
       </div>
 
-      <div className="bg-card border rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+      <div className="space-y-6">
         <div className="space-y-3">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Pilih Tema (Combobox Autocomplete)
@@ -49,7 +49,7 @@ export default function ThemeSettingsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t">
           <button
             onClick={() => switchTheme("light")}
             className={cn(

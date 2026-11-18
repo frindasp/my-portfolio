@@ -57,7 +57,7 @@ export default function SettingsHistoryPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-3xl border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border">
         <table className="w-full text-left text-xs">
           <thead className="bg-muted/40 font-bold uppercase tracking-wider text-muted-foreground border-b text-[10px]">
             <tr>

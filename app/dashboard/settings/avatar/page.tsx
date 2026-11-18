@@ -109,7 +109,7 @@ export default function AvatarSettingsPage() {
         </p>
       </div>
 
-      <div className="bg-card border rounded-3xl p-6 sm:p-8 space-y-8 shadow-sm">
+      <div className="space-y-8">
         <div className="flex flex-col sm:flex-row items-center gap-6 pb-8 border-b">
           <div className="relative group">
             <input

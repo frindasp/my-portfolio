@@ -18,9 +18,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="flex flex-col h-full min-h-0 gap-4 max-w-6xl w-full mx-auto">
       {/* Settings Tab Navigation Header */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-card/60 backdrop-blur-md border rounded-2xl overflow-x-auto no-scrollbar">
+      <div className="shrink-0 flex items-center gap-1.5 p-1.5 bg-card/60 backdrop-blur-md border rounded-2xl overflow-x-auto no-scrollbar">
         {settingTabs.map((tab) => {
           const isActive = pathname === tab.href;
           return (
@@ -41,7 +41,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         })}
       </div>
 
-      <div>{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-3xl border bg-card p-5 sm:p-8 shadow-sm">
+        {children}
+      </div>
     </div>
   );
 }
